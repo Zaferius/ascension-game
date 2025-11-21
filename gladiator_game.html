@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena Legends v7.0</title>
+    <link rel="stylesheet" href="gladiator_game.css">
+</head>
+<body>
+
+<div id="game-container">
+    
+    <!-- START -->
+    <div id="screen-start" class="menu-screen">
+        <h1>ARENA LEGENDS</h1>
+        <div>V7.0 - POLISHED</div>
+        <button class="btn btn-primary" onclick="game.newGameView()">New Game</button>
+        <button class="btn" id="btn-continue" onclick="game.loadGame()">Continue</button>
+    </div>
+
+    <!-- CREATION -->
+    <div id="screen-creation" class="menu-screen hidden">
+        <h2>CREATE GLADIATOR</h2>
+        <div style="display:flex; gap:10px; margin:20px;">
+            <div class="avatar-option selected" onclick="game.selectAvatar(0)">🗿</div>
+            <div class="avatar-option" onclick="game.selectAvatar(1)">🦁</div>
+            <div class="avatar-option" onclick="game.selectAvatar(2)">💀</div>
+            <div class="avatar-option" onclick="game.selectAvatar(3)">👺</div>
+        </div>
+        <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12">
+        <select id="inp-class">
+            <option value="Warrior">Warrior (Balanced)</option>
+            <option value="Beserker">Berserker (High STR)</option>
+            <option value="Guardian">Guardian (High DEF)</option>
+        </select>
+        <button class="btn btn-primary" onclick="game.createCharacter()">Enter Arena</button>
+    </div>
+
+    <!-- HUB -->
+    <div id="screen-hub" class="menu-screen hidden" style="padding:0; justify-content: flex-start;">
+        <div class="hub-top">
+            <div style="display:flex; align-items:center;">
+                <div class="avatar-box" id="ui-avatar">🗿</div>
+                <div>
+                    <div id="ui-name" style="font-size:1.4rem;">Player</div>
+                    <div class="glow-purple">Level <span id="ui-lvl">1</span></div>
+                </div>
+            </div>
+            <div style="font-size:1.4rem; display:flex; align-items:center; gap:8px;">
+                <span class="text-gold">💰 <span id="ui-gold">0</span></span>
+                <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="game.addTestGold()">+100</button>
+            </div>
+        </div>
+
+        <div class="hub-content">
+            <div class="hub-sidebar">
+                <h4 style="border-bottom:1px solid #444; padding-bottom:5px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>STATS</span>
+                    <button class="btn" style="padding:4px 10px; font-size:0.7rem; margin-left:8px;" onclick="game.openStatsHelp()">📜 INFO</button>
+                </h4>
+                <div id="ui-stats"></div>
+                
+                <h4 style="margin-top:30px; border-bottom:1px solid #444; padding-bottom:5px; margin-bottom:15px;">EQUIPMENT</h4>
+                <div id="ui-equip"></div>
+            </div>
+
+            <div class="hub-main">
+                <h2 style="margin-bottom:30px; letter-spacing: 2px;">HUB CITY</h2>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 500px;">
+                    <button class="btn btn-primary" onclick="combat.init()">⚔️ FIGHT ARENA</button>
+                    <button class="btn" onclick="game.openShop('weapon')">🔨 Weaponsmith</button>
+                    <button class="btn" onclick="game.openShop('armor')">🛡️ Armory</button>
+                    <button class="btn" onclick="game.openInventory()">🎒 Inventory</button>
+                    <button class="btn" style="background:#4a148c; border-color:#7b1fa2;" onclick="blackjack.open()">🎲 GAMBLE</button>
+                    <button class="btn" style="background:#2a2a2a" onclick="game.saveGameManually()">💾 Save</button>
+                </div>
+                <div id="hub-msg" style="margin-top:20px; color:#aaa; font-style:italic; min-height: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMBAT -->
+    <div id="screen-combat" class="hidden">
+        <div id="turn-indicator" style="text-align:center; font-size:2.5rem; margin-top:5px; text-shadow:0 0 15px rgba(0,0,0,0.8);" class="text-green">PLAYER TURN</div>
+
+        <!-- ENEMY -->
+        <div class="combat-unit enemy-unit" onclick="combat.inspectEnemy()">
+            <div style="font-size:1.4rem;">
+                <span id="c-enemy-name">Orc</span> <span id="c-enemy-lvl" style="color:#666; font-size:1rem;">Lvl 1</span>
+            </div>
+            <div class="bar-group">
+                <!-- HP (Right Aligned) -->
+                <div class="bar-base enemy-bar-container" style="border-color:#333;">
+                    <div class="bar-text" id="c-enemy-hp-text">100/100</div>
+                    <div id="c-enemy-hp" class="bar-fill" style="background:var(--accent-red);"></div>
+                </div>
+            </div>
+            <div style="font-size:0.7rem; color:#666;">(Click to Inspect)</div>
+        </div>
+
+        <!-- THINKING TEXT -->
+        <div id="enemy-think" class="pulse-text" style="position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); font-size:1.5rem; color:#aaa; display:none;">
+            Enemy is thinking...
+        </div>
+
+        <!-- DAMAGE OVERLAY -->
+        <div id="dmg-overlay" class="dmg-text" style="top:50%; left:50%; transform:translate(-50%, -50%);"></div>
+
+        <!-- PLAYER -->
+        <div class="combat-unit player-unit">
+            <div id="c-player-name" style="font-size:1.4rem;">Player</div>
+            <div class="bar-group">
+                <!-- Armor Bar -->
+                <div class="bar-base" style="height:24px;">
+                    <div class="bar-text" id="c-player-arm-text">0/0</div>
+                    <div id="c-player-arm" class="bar-fill" style="background:var(--shield-color);"></div>
+                </div>
+                <!-- HP Bar -->
+                <div class="bar-base">
+                    <div class="bar-text" id="c-player-hp-text">100/100</div>
+                    <div id="c-player-hp" class="bar-fill" style="background:var(--accent-green);"></div>
+                </div>
+            </div>
+            <div style="margin-top:5px; color:#aaa; font-size:0.8rem;">
+                Regen: +<span id="c-regen">0</span>
+            </div>
+            <div id="status-row" style="margin-top:4px; font-size:0.8rem; color:#888; min-height:18px;">
+                <span id="status-icons"></span>
+            </div>
+            <div id="resist-row" style="margin-top:2px; font-size:0.8rem; color:#888; min-height:18px;">
+                <span id="resist-icons"></span>
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="combat-actions" id="combat-actions">
+            <button id="btn-quick" class="c-btn c-btn-quick" onclick="combat.playerAttack('quick')"><div>QUICK</div><small id="hit-quick">95%</small></button>
+            <button id="btn-normal" class="c-btn c-btn-normal" onclick="combat.playerAttack('normal')"><div>NORMAL</div><small id="hit-normal">80%</small></button>
+            <button id="btn-power" class="c-btn c-btn-power" onclick="combat.playerAttack('power')"><div>POWER</div><small id="hit-power">50%</small></button>
+            <button class="c-btn c-btn-heal" onclick="combat.playerAttack('heal')"><div>POTION</div><small>Heal 40%</small></button>
+        </div>
+    </div>
+
+    <!-- SHOP/INV -->
+    <div id="screen-list" class="menu-screen hidden" style="justify-content: flex-start; padding-top:40px;">
+        <div style="display:flex; justify-content:space-between; width:90%; align-items:center;">
+            <h2 id="list-title" style="margin:0;">SHOP</h2>
+            <div class="text-gold" style="font-size:1.2rem;">💰 <span id="shop-gold">0</span></div>
+        </div>
+        <div style="width:95%; margin-top:10px;">
+            <div class="shop-header">
+                <div>ITEM</div>
+                <div class="sort-btn" onclick="game.toggleSort('rarity')">RARITY ↕</div>
+                <div class="sort-btn" onclick="game.toggleSort('stat')">STATS ↕</div>
+                <div class="sort-btn" onclick="game.toggleSort('price')">PRICE ↕</div>
+                <div>ACTION</div>
+            </div>
+            <div id="list-container" class="item-list"></div>
+        </div>
+        <button class="btn" style="margin-top:20px;" onclick="game.showHub()">Back to Hub</button>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modal-victory" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h1 class="text-green" style="margin:0; font-size:3rem;">VICTORY!</h1>
+            <p style="color:#aaa;">Enemy Defeated.</p>
+            <div style="font-size:1.5rem; margin:16px 0 10px 0;">
+                <div class="text-gold">+<span id="vic-gold">0</span> Gold</div>
+                <div class="text-blue">+<span id="vic-xp">0</span> XP</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:0.95rem; margin-bottom:4px;">
+                <div class="text-blue" style="text-align:left; font-weight:bold;">
+                    EXP +<span id="vic-xp-gain">0</span>
+                </div>
+                <div id="vic-xp-text" style="color:#eee; text-align:right; font-weight:bold;">0 / 100</div>
+            </div>
+            <div class="xp-bar-container" style="margin-top:0;"><div id="vic-xp-bar" class="xp-bar-fill"></div></div>
+            <button class="btn btn-primary" style="width:100%" onclick="game.closeVictory()">CONTINUE</button>
+        </div>
+    </div>
+
+    <div id="modal-gamble" class="modal-overlay hidden">
+        <div class="modal-box" style="width:500px; border-color:#7b1fa2;">
+            <div class="close-btn" onclick="blackjack.close()">&times;</div>
+            <h2 class="text-purple">BLACKJACK</h2>
+            <div id="bj-setup">
+                <p>Place your bet:</p>
+                <input type="number" id="bj-bet" value="50" min="10" style="width:100px;">
+                <button class="btn btn-primary" onclick="blackjack.deal()">DEAL</button>
+                <p style="font-size:0.8rem; color:#888;">Current Gold: 💰 <span id="bj-gold">0</span></p>
+            </div>
+            <div id="bj-game" class="hidden">
+                <div class="card-table">
+                    <div><div style="color:#aaa; font-size:0.8rem;">DEALER</div><div id="dealer-hand" class="hand-area"></div><div id="dealer-score" style="color:#fff;"></div></div>
+                    <div id="bj-msg" style="text-align:center; font-weight:bold; font-size:1.2rem; color:#fff;"></div>
+                    <div><div style="color:#aaa; font-size:0.8rem;">YOU</div><div id="player-hand" class="hand-area"></div><div id="player-score" style="color:#fff;"></div></div>
+                    <div id="bj-result-overlay" class="bj-result hidden">
+                        <div class="bj-result-box">
+                            <div id="bj-result-text">RESULT</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:15px;" id="bj-controls">
+                    <button class="btn" onclick="blackjack.hit()">HIT</button>
+                    <button class="btn" onclick="blackjack.stand()">STAND</button>
+                </div>
+                <button id="bj-reset" class="btn hidden" onclick="blackjack.reset()">PLAY AGAIN</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-inspect" class="modal-overlay hidden" onclick="this.classList.add('hidden')">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="close-btn" onclick="$('modal-inspect').classList.add('hidden')">&times;</div>
+            <h2 id="ins-name" class="text-red">Enemy Name</h2>
+            <div style="text-align:left; padding:0 20px; font-size:1.1rem; line-height:1.8;">
+                <div>Level: <span id="ins-lvl" class="text-white">1</span></div>
+                <div>STR: <span id="ins-str" class="text-orange">10</span></div>
+                <div>ATK: <span id="ins-atk" class="text-red">10</span></div>
+                <div>DEF: <span id="ins-def" class="text-blue">10</span></div>
+                <div>VIT: <span id="ins-vit" class="text-green">10</span></div>
+                <div>MAG: <span id="ins-mag" class="text-purple">0</span></div>
+                <hr style="border:0; border-top:1px solid #444; margin:10px 0;">
+                <div style="color:#888; font-style:italic;" id="ins-desc">"A dangerous foe."</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-armor" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:620px; width:620px;">
+            <div class="close-btn" onclick="game.closeArmorPanel()">&times;</div>
+            <h2 class="text-shield">ARMOR PIECES</h2>
+            <div id="armor-summary" style="margin-bottom:10px; color:#aaa; font-size:0.9rem;">Equipped armor pieces: 0/8</div>
+            <div id="armor-list" style="max-height:260px; overflow-y:auto; text-align:left; margin-top:5px; margin-bottom:10px; font-size:0.9rem;"></div>
+            <div style="margin-top:4px; font-size:1rem;">
+                Total Armor: <span id="armor-total" class="text-shield">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-levelup" class="modal-overlay hidden">
+        <div class="modal-box" style="border-color:var(--accent-purple);"><h1 class="text-purple">LEVEL UP!</h1><p>Points: <span id="lvl-pts" class="text-green">3</span></p><div id="stat-allocator"></div><button id="btn-lvl-confirm" class="btn" style="width:100%; margin-top:20px;" onclick="game.confirmLevelUp()">CONFIRM</button></div>
+    </div>
+
+    <div id="modal-stats" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:520px; text-align:left;">
+            <div class="close-btn" onclick="game.closeStatsHelp()">&times;</div>
+            <h2 style="margin-top:0;">STAT DETAILS</h2>
+            <ul style="list-style:none; padding-left:0; font-size:0.95rem; line-height:1.6;">
+                <li><strong>STR</strong> – Increases weapon damage range (min / max).</li>
+                <li><strong>ATK</strong> – Increases your chance to hit and critical strike chance.</li>
+                <li><strong>DEF</strong> – Reduces enemy chance to hit you.</li>
+                <li><strong>VIT</strong> – Increases maximum Health and HP regeneration per turn.</li>
+                <li><strong>MAG</strong> – Reserved for future spells and special abilities.</li>
+                <li><strong>CHR</strong> – Reduces shop prices and increases Gold & XP rewards from fights.</li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+<script src="itemNameGenerator.js"></script>
+<script src="statusEffectsConfig.js"></script>
+<script src="gladiator_game.js"></script>
+</body>
+</html>
