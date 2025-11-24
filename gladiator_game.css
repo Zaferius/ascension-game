@@ -14,6 +14,11 @@
     --font-main: 'Poppins', sans-serif;
 }
 
+/* Shop BUY button subtle dark-blue glow when buyable */
+.btn-buy:not([disabled]) {
+    box-shadow: 0 0 6px rgba(0, 80, 255, 0.7);
+}
+
 * { box-sizing: border-box; user-select: none; outline: none; }
 
 body {
@@ -208,6 +213,51 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
 .diff-pos { color: var(--accent-green); font-size: 0.75rem; margin-left: 4px; }
 .diff-neg { color: var(--accent-red); font-size: 0.75rem; margin-left: 4px; }
 
+/* Shop hover preview tooltip (follows cursor) */
+.shop-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translateY(4px);
+    width: 320px;
+    max-width: 420px;
+    padding: 10px 12px;
+    background: rgba(10,10,10,0.95);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 0 22px rgba(0,0,0,0.85);
+    font-size: 0.85rem;
+    color: #ddd;
+    opacity: 0;
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    z-index: 70;
+    pointer-events: none; /* tooltip, never blocks clicks */
+}
+.shop-preview.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.shop-preview-title {
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    color: #888;
+    margin-bottom: 6px;
+}
+.shop-preview-body {
+    line-height: 1.4;
+}
+
+/* Weapon type icon inside tooltip (top-right corner) */
+.shop-preview-icon {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.8));
+}
+
 /* --- BLACKJACK --- */
 .card-table { background: #0f380f; border: 4px solid #4a2c0f; border-radius: 10px; padding: 20px; width: 100%; min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
 .hand-area { display: flex; justify-content: center; gap: 10px; min-height: 80px; }
@@ -243,8 +293,32 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
 }
 
 /* Blackjack result overlay */
-.bj-result { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.75); z-index:10; }
-.bj-result-box { padding:18px 32px; border-radius:12px; border:2px solid #7b1fa2; background:#0c0c0c; box-shadow:0 0 25px #000; text-transform:uppercase; letter-spacing:2px; font-size:1.6rem; }
+.bj-result {
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding-top:12px;
+    background:transparent; /* Ortayı karartma, kartlar görünsün */
+    z-index:10;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.3s ease-out;
+}
+.bj-result.visible {
+    opacity:1;
+}
+.bj-result-box {
+    padding:10px 22px;
+    border-radius:10px;
+    border:2px solid #7b1fa2;
+    background:rgba(12,12,12,0.95);
+    box-shadow:0 0 18px #000;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    font-size:1.2rem;
+}
 
 /* --- MODALS --- */
 .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 50; display: flex; justify-content: center; align-items: center; }

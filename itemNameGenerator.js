@@ -113,9 +113,9 @@ const itemNameData = {
             "of the Bone Colossus","of the Thorned Crown","of the Immortal Duel","of the Titan Wars"
         ],
         legendary: [
-            "of Soul Harvest","of the World Eater","of the First Flame","of the Final Eclipse","of the Last Gladiator","of the World Forge","of the Dawnless Age","of the Broken Pantheon",
-            "of the Living Storm","of the Void Serpent","of the Dragon's Grave","of the Silent King","of the Eternal Colosseum","of the Sun's Grave","of the Primeval Roar","of the Blood Tribunal",
-            "of the Godfall","of the Last Sun","of the Final Oath","of the Endless War"
+            "Soul Harvest","the World Eater","the First Flame","the Final Eclipse","the Last Gladiator","the World Forge","the Dawnless Age","the Broken Pantheon",
+            "the Living Storm","the Void Serpent","the Dragon's Grave","the Silent King","the Eternal Colosseum","the Sun's Grave","the Primeval Roar","the Blood Tribunal",
+            "the Godfall","the Last Sun","the Final Oath","the Endless War"
         ]
     },
 
@@ -251,7 +251,11 @@ function generateItemName(context) {
     const prefixPool = data.rarityPrefixes[rarity] || [];
     const suffixPool = data.raritySuffixes[rarity] || [];
     const rarityPrefix = prefixPool.length ? randomChoice(prefixPool) : '';
-    const raritySuffix = suffixPool.length ? randomChoice(suffixPool) : '';
+    const rawSuffix = suffixPool.length ? randomChoice(suffixPool) : '';
+    // Legendary suffixlerde baştaki "of" kelimesini at
+    const raritySuffix = (rarity === 'legendary')
+        ? rawSuffix.replace(/^of\s+/i, '')
+        : rawSuffix;
 
     const patterns = data.namePatterns[category] || data.namePatterns.weapon;
     let pattern = randomChoice(patterns);
