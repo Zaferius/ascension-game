@@ -3,8 +3,47 @@ const rng = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const AVATARS = ['🗿', '🦁', '💀', '👺'];
+
+const INTRO_SCRIPT = {
+    textColor: '#E8E2C8',
+    scenes: [
+        {
+            id: 'scene1',
+            bg: 'assets/images/intro/intro1.png',
+            lines: [
+                { text: 'They stripped you of your name', delay: 500,  fadeIn: 1200, hold: 2500 },
+                { text: 'They took your pride, your freedom your life', delay: 400, fadeIn: 1200, hold: 2700 },
+                { text: 'In the darkness, you were forgotten', delay: 400, fadeIn: 1300, hold: 2800 }
+            ]
+        },
+        {
+            id: 'scene2',
+            bg: 'assets/images/intro/intro2.png',
+            lines: [
+                { text: 'But something survived', delay: 700,  fadeIn: 1200, hold: 2400 },
+                { text: 'Pain did not break you it forged you', delay: 400, fadeIn: 1200, hold: 2700 },
+                { text: 'Every scar became a promise', delay: 400, fadeIn: 1300, hold: 2800 }
+            ]
+        },
+        {
+            id: 'scene3',
+            bg: 'assets/images/intro/intro3.png',
+            lines: [
+                { text: 'Now you stand again', delay: 800,  fadeIn: 1200, hold: 2300 },
+                { text: 'Not to beg', delay: 300, fadeIn: 1100, hold: 2000 },
+                { text: 'Not to survive', delay: 300, fadeIn: 1100, hold: 2100 },
+                { text: 'But to conquer', delay: 300, fadeIn: 1300, hold: 2600 }
+            ]
+        }
+    ],
+    finalPauseMs: 1000,
+    finalLines: [
+        'They tried to erase you',
+        'Now make them remember'
+    ]
+};
 const SAVE_KEY = 'arenaV7_saves';
-const ARMOR_SLOTS = ['head', 'neck', 'shoulders', 'chest', 'arms', 'shield', 'thighs', 'shins'];
+const ARMOR_SLOTS = ['head','neck','shoulders','chest','arms','shield','thighs','shins'];
 const TRINKET_SLOTS = ['trinket1', 'trinket2'];
 const BASE_STATS = {
     Warrior:  { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 },
@@ -12,7 +51,38 @@ const BASE_STATS = {
     Guardian: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 }
 };
 
-// Global armor icon resolver so both shop and armor panel can use it
+// Global UI SFX for hover / select
+const uiSounds = {
+    hover: new Audio('assets/sfx/hover-sound.wav'),
+    select: new Audio('assets/sfx/select-sound.wav')
+};
+
+function playUiHover() {
+    try {
+        uiSounds.hover.currentTime = 0;
+        uiSounds.hover.play();
+    } catch(e) {}
+}
+
+function playUiSelect() {
+    try {
+        uiSounds.select.currentTime = 0;
+        uiSounds.select.play();
+    } catch(e) {}
+}
+
+function wireButtonSfx(root) {
+    const scope = root || document;
+    const btns = scope.querySelectorAll('button, .btn, .c-btn');
+    btns.forEach(b => {
+        if (!b.__sfxBound) {
+            b.addEventListener('mouseenter', playUiHover);
+            b.addEventListener('click', playUiSelect);
+            b.__sfxBound = true;
+        }
+    });
+}
+
 const getArmorIconPath = (item) => {
     if (!item || item.type !== 'armor') return '';
     const slot = (item.slot || '').toLowerCase();
@@ -269,11 +339,24 @@ const game = {
         this.writeSaveMeta({ slots: this.saveSlots, lastSlot: this.lastSlot });
         return true;
     },
-    newGameView() {
+    async newGameView() {
         if (!this.ensureSlotForNewPlayer()) return;
-        $('screen-start').classList.add('hidden'); $('screen-creation').classList.remove('hidden');
-        // creation ekranına girerken varsayılan karakter + stat panelini hemen hazırla
-        this.createCharacter();
+        const introScreen = $('screen-intro');
+        const startScreen = $('screen-start');
+        const skipBtn = $('intro-skip-button');
+        this._introCancelled = false;
+        if (skipBtn) {
+            skipBtn.onclick = () => {
+                this._introCancelled = true;
+                this.finishNewGameIntro();
+            };
+        }
+        if (startScreen) startScreen.classList.add('hidden');
+        if (introScreen) introScreen.classList.remove('hidden');
+        await this.playIntroSequence(true);
+        if (!this._introCancelled) {
+            this.finishNewGameIntro();
+        }
     },
     createCharacter() {
         const name = $('inp-name').value || "Gladiator";
@@ -393,6 +476,7 @@ const game = {
     showHub() {
         document.querySelectorAll('.menu-screen, .hidden').forEach(e => { if(!e.classList.contains('modal-overlay')) e.classList.add('hidden'); });
         $('screen-combat').classList.add('hidden'); $('screen-hub').classList.remove('hidden'); this.updateHubUI();
+        wireButtonSfx($('screen-hub'));
     },
     openStatsHelp() {
         const m = $('modal-stats');
@@ -415,6 +499,55 @@ const game = {
         const previewBox = $('shop-preview');
         const previewBody = $('shop-preview-body');
         const previewIcon = $('shop-preview-icon');
+        const buildPreview = (item, slot) => {
+            if (!item || !previewBody) return;
+            const rarityText = (item.rarity || '').replace('rarity-','');
+            let lines = [];
+            lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
+            const val = (typeof item.val === 'number') ? ` (+${item.val})` : '';
+            lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
+            if (slot) lines.push(`<div><span class="text-blue">Slot:</span> ${slot}</div>`);
+
+            // StatMods (örneğin +2 Defence) göster
+            if (item.statMods) {
+                const map = [
+                    { key: 'str', label: 'Strength', cls: 'text-orange' },
+                    { key: 'atk', label: 'Attack',   cls: 'text-red' },
+                    { key: 'def', label: 'Defence',  cls: 'text-blue' },
+                    { key: 'vit', label: 'Vitality', cls: 'text-green' },
+                    { key: 'mag', label: 'Magicka',  cls: 'text-purple' },
+                    { key: 'chr', label: 'Charisma', cls: 'text-gold' }
+                ];
+                map.forEach(({key,label,cls}) => {
+                    const v = item.statMods[key];
+                    if (typeof v === 'number' && v !== 0) {
+                        const sign = v > 0 ? '+' : '';
+                        lines.push(`<div class="${cls}">${sign}${v} ${label}</div>`);
+                    }
+                });
+            }
+
+            // Lore / info satırı
+            if (item.info) {
+                const infoClass = item.infoColor || 'text-gold';
+                lines.push(`<div style="margin-top:4px; font-size:0.8rem; font-style:italic;" class="${infoClass}">${item.info}</div>`);
+            }
+
+            lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityText}</div>`);
+            previewBody.innerHTML = lines.join('');
+
+            // Update armor icon in tooltip for armor panel
+            if (previewIcon) {
+                const iconPath = getArmorIconPath(item);
+                if (iconPath) {
+                    previewIcon.src = iconPath;
+                    previewIcon.classList.remove('hidden');
+                } else {
+                    previewIcon.src = '';
+                    previewIcon.classList.add('hidden');
+                }
+            }
+        };
         const movePreview = (ev) => {
             if (!previewBox) return;
             const rect = $('game-container').getBoundingClientRect();
@@ -445,10 +578,7 @@ const game = {
             row.innerHTML = `<span>${title}</span><span>${rightHtml}</span>`;
             if (item && previewBox && previewBody) {
                 row.onmouseenter = (ev) => {
-                    // Shop/enventory ile aynı tooltip kartını kullan
-                    if (typeof buildPreviewFromItem === 'function') {
-                        buildPreviewFromItem(item);
-                    }
+                    buildPreview(item, slot);
                     movePreview(ev);
                     previewBox.classList.remove('hidden');
                     previewBox.classList.add('visible');
@@ -478,10 +608,154 @@ const game = {
         const start = $('screen-start');
         if (start) start.classList.remove('hidden');
     },
+    async initIntro() {
+        this.initSaves();
+    },
+    async playIntroSequence(forNewGame = false) {
+        const introScreen = $('screen-intro');
+        const bg = $('intro-background');
+        const img = $('intro-image');
+        const txt = $('intro-text');
+        if (!introScreen || !bg || !img || !txt) return;
+        const bass = new Audio('assets/audio/ui/deep_bass_hit.ogg');
+        const setOpacity = (o) => {
+            introScreen.style.opacity = String(o);
+        };
+        introScreen.style.background = '#000';
+        setOpacity(1);
+        const showLine = async (content, opts) => {
+            txt.style.opacity = '0';
+            txt.style.color = '#bbbbbb';
+            txt.style.textShadow = '';
+            txt.innerText = content;
+            if (opts && opts.delay) await wait(opts.delay);
+            try { bass.currentTime = 0; bass.play(); } catch {}
+            const fadeInMs = (opts && opts.fadeIn) || 1200;
+            const holdMs = (opts && opts.hold) || 2200;
+            const start = performance.now();
+            return new Promise(resolve => {
+                const stepIn = (t) => {
+                    const p = Math.min(1, (t - start) / fadeInMs);
+                    txt.style.opacity = String(p);
+                    if (p < 1) {
+                        requestAnimationFrame(stepIn);
+                    } else {
+                        setTimeout(resolve, holdMs);
+                    }
+                };
+                requestAnimationFrame(stepIn);
+            });
+        };
+        for (const scene of INTRO_SCRIPT.scenes) {
+            img.src = scene.bg;
+            img.style.opacity = '0';
+            txt.style.textShadow = '';
+            // fade in scene image
+            {
+                const fadeMs = 800;
+                const start = performance.now();
+                await new Promise(resolve => {
+                    const step = (t) => {
+                        const p = Math.min(1, (t - start) / fadeMs);
+                        img.style.opacity = String(p);
+                        if (p < 1 && !this._introCancelled) {
+                            requestAnimationFrame(step);
+                        } else {
+                            resolve();
+                        }
+                    };
+                    requestAnimationFrame(step);
+                });
+            }
+            for (const line of scene.lines) {
+                if (this._introCancelled) return;
+                await showLine(line.text, line);
+            }
+            // fade out image + text between scenes
+            {
+                const fadeMs = 700;
+                const start = performance.now();
+                await new Promise(resolve => {
+                    const step = (t) => {
+                        const p = Math.min(1, (t - start) / fadeMs);
+                        const o = 1 - p;
+                        img.style.opacity = String(o);
+                        txt.style.opacity = String(o);
+                        if (p < 1 && !this._introCancelled) {
+                            requestAnimationFrame(step);
+                        } else {
+                            resolve();
+                        }
+                    };
+                    requestAnimationFrame(step);
+                });
+            }
+        }
+        // final section: pure black, centered quote
+        img.src = '';
+        img.style.opacity = '0';
+        await wait(INTRO_SCRIPT.finalPauseMs);
+        const overlay = $('intro-overlay');
+        if (overlay) {
+            overlay.style.top = '0';
+            overlay.style.bottom = '0';
+            overlay.style.display = 'flex';
+            overlay.style.alignItems = 'center';
+            overlay.style.justifyContent = 'center';
+        }
+        txt.style.textShadow = '0 0 26px #7A1A1A';
+        txt.style.textAlign = 'center';
+        for (let i = 0; i < INTRO_SCRIPT.finalLines.length; i++) {
+            const line = INTRO_SCRIPT.finalLines[i];
+            if (i === INTRO_SCRIPT.finalLines.length - 1) {
+                txt.style.fontSize = '1.6rem';
+                txt.style.textShadow = '0 0 26px #7A1A1A';
+            } else {
+                txt.style.fontSize = '1.4rem';
+                txt.style.textShadow = '0 0 18px #7A1A1A';
+            }
+            await showLine(line, { delay: i === 0 ? 1000 : 400, fadeIn: 1800, hold: 2600 });
+        }
+        // slow fadeout of whole intro before creation fades in
+        {
+            const fadeMs = 1200;
+            const start = performance.now();
+            await new Promise(resolve => {
+                const step = (t) => {
+                    const p = Math.min(1, (t - start) / fadeMs);
+                    setOpacity(1 - p);
+                    if (p < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        resolve();
+                    }
+                };
+                requestAnimationFrame(step);
+            });
+            introScreen.style.opacity = '';
+        }
+    },
+    finishNewGameIntro() {
+        const introScreen = $('screen-intro');
+        if (introScreen) introScreen.classList.add('hidden');
+        $('screen-creation').classList.remove('hidden');
+        this.createCharacter();
+    },
     updateHubUI() {
         const p = this.player;
         $('ui-name').innerText = p.name; $('ui-lvl').innerText = p.level; $('ui-gold').innerText = p.gold; $('ui-avatar').innerText = p.avatar;
+        // Hub XP bar under level label
+        const xpNow = typeof p.xp === 'number' ? p.xp : 0;
+        const xpMax = typeof p.xpMax === 'number' && p.xpMax > 0 ? p.xpMax : 100;
+        const xpPct = Math.max(0, Math.min(100, Math.round((xpNow / xpMax) * 100)));
+        const xpFill = $('hub-xp-fill');
+        const xpText = $('hub-xp-text');
+        if (xpFill) xpFill.style.width = xpPct + '%';
+        if (xpText) xpText.innerText = `${xpNow} / ${xpMax} XP`;
         const dmg = p.getDmgRange(); const arm = p.getTotalArmor();
+
+        // Hub ekranı görünürken buton SFX wiring'ini tazele
+        wireButtonSfx($('screen-hub'));
 
         const effStr = p.getEffectiveStr();
         const effAtk = p.getEffectiveAtk();
@@ -562,137 +836,112 @@ const game = {
         html += `<div class="eq-header">TRINKETS</div>`;
         html += renderSlot('trinket1', 'Trinket 1');
         html += renderSlot('trinket2', 'Trinket 2');
-        // Attach click handler and hub weapon tooltip after injecting HTML
-        setTimeout(() => {
-            const btn = document.querySelector('#ui-equip .stat-row button');
-            if(btn) btn.onclick = () => game.openArmorPanel();
+        $('ui-equip').innerHTML = html;
 
+        // Attach armor panel button + hub weapon / trinket tooltips after injecting HTML
+        const btn = document.querySelector('#ui-equip .stat-row button');
+        if(btn) btn.onclick = () => game.openArmorPanel();
+
+        const previewBox = $('shop-preview');
+        const previewBody = $('shop-preview-body');
+        const previewIcon = $('shop-preview-icon');
+
+        const wireWeaponHover = () => {
             const wName = $('hub-weapon-name');
             const weapon = p.gear.weapon;
-            const previewBox = $('shop-preview');
-            const previewBody = $('shop-preview-body');
-            const previewIcon = $('shop-preview-icon');
-            if (wName && weapon && previewBox && previewBody) {
-                const buildPreview = () => {
-                    const rarityText = (weapon.rarity || '').replace('rarity-','');
-                    let lines = [];
-                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${weapon.rarity}">${weapon.name}</div>`);
-                    lines.push(`<div><span class="text-orange">Damage:</span> ${weapon.min}-${weapon.max}</div>`);
-                    if (weapon.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${weapon.baseType}</div>`);
-                    lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityText}</div>`);
-                    previewBody.innerHTML = lines.join('');
+            if (!wName || !weapon || !previewBox || !previewBody) return;
+            const movePreview = (ev) => {
+                const rect = $('game-container').getBoundingClientRect();
+                const offsetX = 28, offsetY = 25;
+                let x = ev.clientX - rect.left + offsetX;
+                let y = ev.clientY - rect.top + offsetY;
+                const maxX = rect.width - 340;
+                const maxY = rect.height - 160;
+                x = Math.max(10, Math.min(maxX, x));
+                y = Math.max(10, Math.min(maxY, y));
+                previewBox.style.left = x + 'px';
+                previewBox.style.top = y + 'px';
+            };
+            wName.onmouseenter = (ev) => {
+                buildPreviewFromItem(weapon);
+                movePreview(ev);
+                previewBox.classList.remove('hidden');
+                previewBox.classList.add('visible');
+            };
+            wName.onmousemove = (ev) => {
+                if (previewBox.classList.contains('visible')) movePreview(ev);
+            };
+            wName.onmouseleave = () => {
+                previewBox.classList.remove('visible');
+            };
+        }
+        const setupTrinketHover = (elId, trinket) => {
+            const el = $(elId);
+            if (!el || !trinket || !previewBox || !previewBody) return;
+            const buildPreview = () => {
+                const rarityText = (trinket.rarity || '').replace('rarity-','');
+                const lines = [];
+                lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${trinket.rarity}">${trinket.name}</div>`);
+                if (trinket.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${trinket.baseType}</div>`);
+                if (trinket.statMods) {
+                    Object.entries(trinket.statMods).forEach(([k,v]) => {
+                        lines.push(`<div><span class="text-gold">${k.toUpperCase()}:</span> ${v >= 0 ? '+' : ''}${v}</div>`);
+                    });
+                }
+                if (typeof trinket.goldBonus === 'number') {
+                    lines.push(`<div><span class="text-gold">Gold Bonus:</span> +${Math.round(trinket.goldBonus*100)}%</div>`);
+                }
+                if (typeof trinket.xpBonus === 'number') {
+                    lines.push(`<div><span class="text-purple">XP Bonus:</span> +${Math.round(trinket.xpBonus*100)}%</div>`);
+                }
+                const rarityLabel = rarityText || 'unknown';
+                lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityLabel}</div>`);
+                if (trinket.info) {
+                    const infoClass = trinket.infoColor || 'text-gold';
+                    lines.push(`<div style="margin-top:6px; font-size:0.8rem;" class="${infoClass}">${trinket.info}</div>`);
+                }
+                previewBody.innerHTML = lines.join('');
 
-                    // Update weapon type icon for hub equipped weapon
-                    if (previewIcon && typeof getWeaponIconPath === 'function') {
-                        const iconPath = getWeaponIconPath(weapon);
-                        if (iconPath) {
-                            previewIcon.src = iconPath;
-                            previewIcon.classList.remove('hidden');
-                        } else {
-                            previewIcon.src = '';
-                            previewIcon.classList.add('hidden');
-                        }
+                if (previewIcon) {
+                    if (trinket.iconPath) {
+                        previewIcon.src = trinket.iconPath;
+                        previewIcon.classList.remove('hidden');
+                    } else {
+                        previewIcon.src = '';
+                        previewIcon.classList.add('hidden');
                     }
-                };
-
-                const movePreview = (ev) => {
-                    const rect = $('game-container').getBoundingClientRect();
-                    const offsetX = 28, offsetY = 25;
-                    let x = ev.clientX - rect.left + offsetX;
-                    let y = ev.clientY - rect.top + offsetY;
-                    const maxX = rect.width - 340;
-                    const maxY = rect.height - 160;
-                    x = Math.max(10, Math.min(maxX, x));
-                    y = Math.max(10, Math.min(maxY, y));
-                    previewBox.style.left = x + 'px';
-                    previewBox.style.top = y + 'px';
-                };
-
-                wName.onmouseenter = (ev) => {
-                    buildPreview();
-                    movePreview(ev);
-                    previewBox.classList.remove('hidden');
-                    previewBox.classList.add('visible');
-                };
-                wName.onmousemove = (ev) => {
-                    if (previewBox.classList.contains('visible')) movePreview(ev);
-                };
-                wName.onmouseleave = () => {
-                    previewBox.classList.remove('visible');
-                };
-            }
-
-            // Hub trinket tooltips (use same preview box)
-            const setupTrinketHover = (elId, trinket) => {
-                const el = $(elId);
-                if (!el || !trinket || !previewBox || !previewBody) return;
-                const buildPreview = () => {
-                    const rarityText = (trinket.rarity || '').replace('rarity-','');
-                    const lines = [];
-                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${trinket.rarity}">${trinket.name}</div>`);
-                    if (trinket.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${trinket.baseType}</div>`);
-                    if (trinket.statMods) {
-                        Object.entries(trinket.statMods).forEach(([k,v]) => {
-                            lines.push(`<div><span class="text-gold">${k.toUpperCase()}:</span> ${v >= 0 ? '+' : ''}${v}</div>`);
-                        });
-                    }
-                    if (typeof trinket.goldBonus === 'number') {
-                        lines.push(`<div><span class="text-gold">Gold Bonus:</span> +${Math.round(trinket.goldBonus*100)}%</div>`);
-                    }
-                    if (typeof trinket.xpBonus === 'number') {
-                        lines.push(`<div><span class="text-purple">XP Bonus:</span> +${Math.round(trinket.xpBonus*100)}%</div>`);
-                    }
-                    const rarityLabel = rarityText || 'unknown';
-                    lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityLabel}</div>`);
-                    if (trinket.info) {
-                        const infoClass = trinket.infoColor || 'text-gold';
-                        lines.push(`<div style="margin-top:6px; font-size:0.8rem;" class="${infoClass}">${trinket.info}</div>`);
-                    }
-                    previewBody.innerHTML = lines.join('');
-
-                    // Handle item type icon (weapon / armor)
-                    if (previewIcon) {
-                        if (trinket.iconPath) {
-                            previewIcon.src = trinket.iconPath;
-                            previewIcon.classList.remove('hidden');
-                        } else {
-                            previewIcon.src = '';
-                            previewIcon.classList.add('hidden');
-                        }
-                    }
-                };
-                const movePreview = (ev) => {
-                    const rect = $('game-container').getBoundingClientRect();
-                    const offsetX = 28, offsetY = 25;
-                    let x = ev.clientX - rect.left + offsetX;
-                    let y = ev.clientY - rect.top + offsetY;
-                    const maxX = rect.width - 340;
-                    const maxY = rect.height - 160;
-                    x = Math.max(10, Math.min(maxX, x));
-                    y = Math.max(10, Math.min(maxY, y));
-                    previewBox.style.left = x + 'px';
-                    previewBox.style.top = y + 'px';
-                };
-
-                el.onmouseenter = (ev) => {
-                    buildPreview();
-                    movePreview(ev);
-                    previewBox.classList.remove('hidden');
-                    previewBox.classList.add('visible');
-                };
-                el.onmousemove = (ev) => {
-                    if (previewBox.classList.contains('visible')) movePreview(ev);
-                };
-                el.onmouseleave = () => {
-                    previewBox.classList.remove('visible');
-                };
+                }
+            };
+            const movePreview = (ev) => {
+                const rect = $('game-container').getBoundingClientRect();
+                const offsetX = 28, offsetY = 25;
+                let x = ev.clientX - rect.left + offsetX;
+                let y = ev.clientY - rect.top + offsetY;
+                const maxX = rect.width - 340;
+                const maxY = rect.height - 160;
+                x = Math.max(10, Math.min(maxX, x));
+                y = Math.max(10, Math.min(maxY, y));
+                previewBox.style.left = x + 'px';
+                previewBox.style.top = y + 'px';
             };
 
-            setupTrinketHover('hub-trinket1-name', p.gear.trinket1);
-            setupTrinketHover('hub-trinket2-name', p.gear.trinket2);
-        }, 0);
-        
-        $('ui-equip').innerHTML = html;
+            el.onmouseenter = (ev) => {
+                buildPreview();
+                movePreview(ev);
+                previewBox.classList.remove('hidden');
+                previewBox.classList.add('visible');
+            };
+            el.onmousemove = (ev) => {
+                if (previewBox.classList.contains('visible')) movePreview(ev);
+            };
+            el.onmouseleave = () => {
+                previewBox.classList.remove('visible');
+            };
+        };
+
+        wireWeaponHover();
+        setupTrinketHover('hub-trinket1-name', p.gear.trinket1);
+        setupTrinketHover('hub-trinket2-name', p.gear.trinket2);
     },
     doUnequip(slot) { this.player.unequip(slot); this.updateHubUI(); this.saveGame(); },
     openShop(type) {
@@ -714,11 +963,13 @@ const game = {
         this.sortShop(list);
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
         this.renderList(list, 'shop'); $('shop-gold').innerText = this.player.gold;
+        wireButtonSfx($('screen-list'));
     },
     openInventory() {
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
         this.currentInvFilter = this.currentInvFilter || 'all';
         this.renderList(this.player.inventory, 'inv'); $('shop-gold').innerText = this.player.gold;
+        wireButtonSfx($('screen-list'));
     },
     renderList(items, mode) {
         this.currentListMode = mode;
@@ -815,14 +1066,30 @@ const game = {
             const rarityText = (item.rarity || '').replace('rarity-','');
             const minLvl = getItemMinLevel(item);
             let lines = [];
+            // Title (name)
             lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
+            // Core stats
             if (item.type === 'weapon') {
-                lines.push(`<div><span class="text-orange">Damage:</span> ${item.min}-${item.max}</div>`);
+                let dmgLine = `${item.min}-${item.max}`;
+                const equipped = this.player && this.player.gear ? this.player.gear.weapon : null;
+                if (equipped && typeof equipped.min === 'number' && typeof equipped.max === 'number') {
+                    const curAvg = (equipped.min + equipped.max) / 2;
+                    const newAvg = (item.min + item.max) / 2;
+                    const diff = Math.round(newAvg - curAvg);
+                    if (diff !== 0) {
+                        const sign = diff > 0 ? '+' : '';
+                        const diffCls = diff > 0 ? 'text-green' : 'text-red';
+                        dmgLine += ` <span class="${diffCls}" style="font-size:0.85rem;">(${sign}${diff})</span>`;
+                    }
+                }
+                lines.push(`<div><span class="text-orange">Damage:</span> ${dmgLine}</div>`);
                 if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
             } else if (item.type === 'armor') {
                 const val = (typeof item.val === 'number') ? item.val : 0;
                 lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
                 if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
+            } else if (item.type === 'trinket') {
+                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
             }
             // Stat buffs / debuffs from statMods
             if (item.statMods) {
@@ -1024,39 +1291,10 @@ const game = {
                 <button class="${btnClass}" style="padding:5px 10px; font-size:0.8rem;" ${btnState}>${btnTxt}</button>
             `;
 
-            // Hover tooltip for all items (shop or inventory) + comparison vs equipped
+            // Hover tooltip for all items (shop or inventory)
             if (previewBox && previewBody) {
                 div.onmouseenter = (ev) => {
                     buildPreviewFromItem(item);
-                    // Karlastma satrn ekle
-                    const equipped = (item.type === 'weapon')
-                        ? this.player.gear.weapon
-                        : (item.type === 'armor')
-                            ? this.player.gear[item.slot]
-                            : null;
-                    let diffText = '';
-                    let diffClass = '';
-                    if (item.type === 'weapon' && equipped) {
-                        const curAvg = (equipped.min + equipped.max) / 2;
-                        const newAvg = (item.min + item.max) / 2;
-                        const diff = Math.round(newAvg - curAvg);
-                        if (diff !== 0) {
-                            diffClass = diff > 0 ? 'text-green' : 'text-red';
-                            const sign = diff > 0 ? '+' : '';
-                            diffText = `<div class="${diffClass}" style="margin-top:4px;">Compared to equipped: ${sign}${diff} avg damage</div>`;
-                        }
-                    } else if (item.type === 'armor' && equipped) {
-                        const curVal = equipped.val || 0;
-                        const diff = (item.val || 0) - curVal;
-                        if (diff !== 0) {
-                            diffClass = diff > 0 ? 'text-green' : 'text-red';
-                            const sign = diff > 0 ? '+' : '';
-                            diffText = `<div class="${diffClass}" style="margin-top:4px;">Compared to equipped: ${sign}${diff} Armor</div>`;
-                        }
-                    }
-                    if (diffText && previewBody) {
-                        previewBody.innerHTML += diffText;
-                    }
                     movePreview(ev);
                     previewBox.classList.remove('hidden');
                     previewBox.classList.add('visible');
@@ -1425,6 +1663,17 @@ const combat = {
         this.maxArmor = p.getTotalArmor(); this.armor = this.maxArmor;
         this.playerDots = [];
         this.dotResist = {};
+        // Yeni dövüşe girerken önceki fight'tan kalan UI izlerini temizle
+        const dmgEl = $('dmg-overlay');
+        if (dmgEl) {
+            dmgEl.innerText = '';
+            dmgEl.className = 'dmg-text';
+        }
+        const logEl = $('combat-log');
+        if (logEl) {
+            logEl.innerHTML = '';
+            logEl.classList.remove('expanded');
+        }
         const s = p.level;
         const enemyName = ["Orc", "Goblin", "Bandit", "Skeleton", "Troll"][rng(0,4)];
 
@@ -1467,7 +1716,9 @@ const combat = {
             atk: stats.atk,
             def: stats.def,
             vit: stats.vit,
-            mag: 0
+            mag: 0,
+            armor: 0,
+            maxArmor: 0
         };
 
         // Enemy silahını merkezi WEAPONS kataloğundan seç
@@ -1542,6 +1793,11 @@ const combat = {
         // Enemy'nin gerçek max HP'sini (silah buff'lı VIT + level'e göre) ayarla
         this.enemy.maxHp = this.getEnemyMaxHp(this.enemy);
         this.enemy.hp = this.enemy.maxHp;
+
+        // Enemy armor: level ve DEF/VIT'e göre basit bir değer
+        const baseArm = Math.max(0, Math.floor(this.enemy.def * 1.2 + this.enemy.vit * 0.8 + s * 2));
+        this.enemy.maxArmor = baseArm;
+        this.enemy.armor = baseArm;
         $('screen-hub').classList.add('hidden'); $('screen-combat').classList.remove('hidden'); $('enemy-think').style.display='none';
         this.log = [];
         this.logMessage(`${this.enemy.name} enters the arena!`);
@@ -1668,12 +1924,13 @@ const combat = {
         const e = this.enemy;
         $('c-enemy-name').innerText = e.name; $('c-enemy-lvl').innerText = `Lvl ${e.lvl}`;
         $('c-enemy-hp').style.width = (e.hp/e.maxHp)*100 + '%'; $('c-enemy-hp-text').innerText = `${Math.max(0,e.hp)}/${e.maxHp}`;
+        const enemyArmPct = e.maxArmor > 0 ? (e.armor / e.maxArmor) * 100 : 0;
+        $('c-enemy-arm').style.width = enemyArmPct + '%'; $('c-enemy-arm-text').innerText = `${Math.max(0, e.armor)}/${e.maxArmor}`;
 
         $('c-player-name').innerText = game.player.name;
         $('c-player-hp').style.width = (this.hp/this.maxHp)*100 + '%'; $('c-player-hp-text').innerText = `${Math.max(0,this.hp)}/${this.maxHp}`;
         const armPct = this.maxArmor > 0 ? (this.armor/this.maxArmor)*100 : 0;
         $('c-player-arm').style.width = armPct + '%'; $('c-player-arm-text').innerText = `${Math.max(0,this.armor)}/${this.maxArmor}`;
-        $('c-regen').innerText = game.player.getRegen();
         // render status icons for active DOTs
         const iconContainer = $('status-icons');
         if(iconContainer) {
@@ -1869,13 +2126,35 @@ const combat = {
     },
     takeDamage(amount, target) {
         if(target === 'player') {
+            // Player: önce armor, sonra HP
             let rem = amount;
-            if(this.armor > 0) { if(this.armor >= amount) { this.armor -= amount; rem = 0; } else { rem = amount - this.armor; this.armor = 0; } }
+            if(this.armor > 0) {
+                if(this.armor >= amount) {
+                    this.armor -= amount;
+                    rem = 0;
+                } else {
+                    rem = amount - this.armor;
+                    this.armor = 0;
+                }
+            }
             this.hp -= rem; if(this.hp < 0) this.hp = 0;
             if(rem > 0) this.flashBlood();
         } else {
-            this.enemy.hp -= amount;
-            if (this.enemy.hp < 0) this.enemy.hp = 0;
+            // Enemy: aynı mantık, önce enemy armor, sonra enemy HP
+            const e = this.enemy;
+            if (!e) return;
+            let rem = amount;
+            if (e.armor > 0) {
+                if (e.armor >= amount) {
+                    e.armor -= amount;
+                    rem = 0;
+                } else {
+                    rem = amount - e.armor;
+                    e.armor = 0;
+                }
+            }
+            e.hp -= rem;
+            if (e.hp < 0) e.hp = 0;
         }
     },
     async playerAttack(type) {

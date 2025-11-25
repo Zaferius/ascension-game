@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arena Legends v7.0</title>
+    <title>ASCENSION</title>
     <link rel="stylesheet" href="gladiator_game.css">
     <script src="weapon_catalog.js"></script>
     <script src="armor_catalog.js"></script>
@@ -15,10 +15,21 @@
 
 <div id="game-container">
     
+    <!-- INTRO -->
+    <div id="screen-intro" class="hidden">
+        <div id="intro-background" style="position:absolute; inset:0; background:#000; display:flex; align-items:center; justify-content:center;">
+            <img id="intro-image" src="" alt="Intro" style="max-width:70%; max-height:70%; object-fit:contain; filter:brightness(0.9); border-radius:14px; box-shadow:0 0 40px rgba(0,0,0,0.9);" />
+        </div>
+        <div id="intro-overlay" style="position:absolute; left:0; right:0; bottom:40px; display:flex; align-items:flex-end; justify-content:center;">
+            <div id="intro-text" style="max-width:900px; padding:0 40px; text-align:center; font-size:1.2rem; line-height:1.6; font-style:italic; color:#bbbbbb;"></div>
+        </div>
+        <button id="intro-skip-button" class="btn" style="position:absolute; top:24px; right:32px; font-size:0.8rem; padding:6px 14px; letter-spacing:0.08rem; background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.18);">SKIP</button>
+    </div>
+
     <!-- START -->
     <div id="screen-start" class="menu-screen">
-        <h1>ARENA LEGENDS</h1>
-        <div>V7.0 - POLISHED</div>
+        <h1 class="game-title">ASCENSION</h1>
+        <div class="game-subtitle">v0.72</div>
         <button class="btn btn-primary" onclick="game.newGameView()">New Game</button>
         <button class="btn" id="btn-continue" onclick="game.loadLastGame()">Continue</button>
         <button class="btn" onclick="game.openLoadMenu()">Load</button>
@@ -72,6 +83,12 @@
                 <div>
                     <div id="ui-name" style="font-size:1.4rem;">Player</div>
                     <div class="glow-purple">Level <span id="ui-lvl">1</span></div>
+                    <div class="hub-xp-container">
+                        <div class="hub-xp-bar">
+                            <div id="hub-xp-fill" class="hub-xp-fill"></div>
+                        </div>
+                        <div id="hub-xp-text" class="hub-xp-text">0 / 100 XP</div>
+                    </div>
                 </div>
             </div>
             <div style="font-size:1.4rem; display:flex; align-items:center; gap:8px;">
@@ -119,7 +136,12 @@
                 <span id="c-enemy-name">Orc</span> <span id="c-enemy-lvl" style="color:#666; font-size:1rem;">Lvl 1</span>
             </div>
             <div class="bar-group">
-                <!-- HP (Right Aligned) -->
+                <!-- Enemy Armor Bar -->
+                <div class="bar-base enemy-bar-container" style="border-color:#333; height:24px;">
+                    <div class="bar-text" id="c-enemy-arm-text">0/0</div>
+                    <div id="c-enemy-arm" class="bar-fill" style="background:var(--shield-color);"></div>
+                </div>
+                <!-- Enemy HP Bar -->
                 <div class="bar-base enemy-bar-container" style="border-color:#333;">
                     <div class="bar-text" id="c-enemy-hp-text">100/100</div>
                     <div id="c-enemy-hp" class="bar-fill" style="background:var(--accent-red);"></div>
@@ -154,11 +176,8 @@
                 <!-- HP Bar -->
                 <div class="bar-base">
                     <div class="bar-text" id="c-player-hp-text">100/100</div>
-                    <div id="c-player-hp" class="bar-fill" style="background:var(--accent-green);"></div>
+                    <div id="c-player-hp" class="bar-fill" style="background:var(--accent-red);"></div>
                 </div>
-            </div>
-            <div style="margin-top:5px; color:#aaa; font-size:0.8rem;">
-                Regen: +<span id="c-regen">0</span>
             </div>
             <div id="status-row" style="margin-top:4px; font-size:0.8rem; color:#888; min-height:18px;">
                 <span id="status-icons"></span>
