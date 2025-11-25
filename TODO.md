@@ -10,3 +10,4 @@
 -her arena figth'tı önce kim baslayacaksa yazı tura atma dinamiği. ilerde silahlara özellik ekleriz ( her zaman ilk başla diye falan)
 -Silahlara buff debuff sistemi
 -Load game ile load ettikten sonra pencere kapanmıyor.
+-Shopların level'a göre item cıkarması. alınabilir seyler de olması lazım.

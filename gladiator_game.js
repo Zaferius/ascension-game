@@ -248,16 +248,17 @@ const game = {
     newGameView() {
         if (!this.ensureSlotForNewPlayer()) return;
         $('screen-start').classList.add('hidden'); $('screen-creation').classList.remove('hidden');
+        // creation ekranına girerken varsayılan karakter + stat panelini hemen hazırla
+        this.createCharacter();
     },
     createCharacter() {
         const name = $('inp-name').value || "Gladiator";
         const cls = $('inp-class').value;
         this.player = new Player(name, cls, this.selectedAvatar);
         this.player.equip({ id:1, type:'weapon', name:'Rusty Sword', min:3, max:6, stat:'Damage', rarity:'rarity-common', price:5, weaponClass:'Sword', baseType:'Sword' });
-        // Başlangıçta 9 stat puanı dağıtma ekranı aç
+        // Başlangıçta 9 stat puanı dağıtma panelini (creation ekranının sağ tarafı) hazırla
         this.player.pts = 9;
         this.tempCreateStats = { ...this.player.stats };
-        $('modal-create').classList.remove('hidden');
         this.renderCreateUI();
     },
     generateShopStock() {
@@ -957,12 +958,29 @@ const game = {
     renderCreateUI() {
         const c = $('create-allocator'); if(!c) return; c.innerHTML = '';
         const base = BASE_STATS[this.player.class];
+        const LABELS = {
+            str: 'Strength',
+            atk: 'Attack',
+            def: 'Defence',
+            vit: 'Vitality',
+            mag: 'Magic',
+            chr: 'Charisma'
+        };
         ['str','atk','def','vit','mag','chr'].forEach(k => {
             const d = document.createElement('div');
             d.style.display = 'flex';
             d.style.justifyContent = 'space-between';
-            d.style.marginBottom = '10px';
-            d.innerHTML = `<span>${k.toUpperCase()} <span class="text-blue">${this.tempCreateStats[k]}</span></span><div><button class="btn" onclick="game.modCreateStat('${k}',-1)">-</button><button class="btn" onclick="game.modCreateStat('${k}',1)">+</button></div>`;
+            d.style.alignItems = 'center';
+            d.style.marginBottom = '4px';
+            const label = LABELS[k] || k.toUpperCase();
+            d.innerHTML = `
+                <span style="font-size:0.9rem; flex:1; text-align:left;">${label}</span>
+                <span class="text-blue" style="width:32px; text-align:center;">${this.tempCreateStats[k]}</span>
+                <div style="display:inline-flex; gap:4px; margin-left:4px;">
+                    <button class="btn" style="padding:4px 10px; font-size:0.8rem; margin:0; min-width:0;" onclick="game.modCreateStat('${k}',-1)">-</button>
+                    <button class="btn" style="padding:4px 10px; font-size:0.8rem; margin:0; min-width:0;" onclick="game.modCreateStat('${k}',1)">+</button>
+                </div>
+            `;
             c.appendChild(d);
         });
         $('create-pts').innerText = this.player.pts;
@@ -984,9 +1002,9 @@ const game = {
         this.renderCreateUI();
     },
     confirmCreationStats() {
+        if (!this.player) return;
         this.player.stats = { ...this.tempCreateStats };
         this.player.pts = 0;
-        $('modal-create').classList.add('hidden');
         this.generateShopStock();
         this.showHub();
         this.saveGame();
@@ -1108,7 +1126,29 @@ const combat = {
         this.playerDots = [];
         this.dotResist = {};
         const s = p.level;
-        this.enemy = { name: ["Orc", "Goblin", "Bandit", "Skeleton", "Troll"][rng(0,4)], lvl: s, maxHp: 100+(s*20), hp: 100+(s*20), str: 6+(s*2), atk: 5+s, def: 2+s, vit: 5+s, mag: 0 };
+        const enemyName = ["Orc", "Goblin", "Bandit", "Skeleton", "Troll"][rng(0,4)];
+        // Temel enemy statları
+        this.enemy = { name: enemyName, lvl: s, maxHp: 100+(s*20), hp: 100+(s*20), str: 6+(s*2), atk: 5+s, def: 2+s, vit: 5+s, mag: 0 };
+        // Basit enemy silahı (hasar aralığı + tür)
+        const base = Math.floor(this.enemy.str * 1.2);
+        const weaponMin = Math.max(3, base - 4);
+        const weaponMax = base + 4;
+        let weaponClass = 'Sword';
+        let baseType = 'Sword';
+        if (enemyName === 'Orc' || enemyName === 'Troll') { weaponClass = 'Axe'; baseType = 'Axe'; }
+        else if (enemyName === 'Goblin') { weaponClass = 'Dagger'; baseType = 'Dagger'; }
+        else if (enemyName === 'Skeleton') { weaponClass = 'Spear'; baseType = 'Spear'; }
+        else if (enemyName === 'Bandit') { weaponClass = 'Sword'; baseType = 'Sword'; }
+        // icon path haritası (player silah ikonlarıyla uyumlu)
+        let iconPath = '';
+        const clsLower = weaponClass.toLowerCase();
+        if (clsLower === 'axe') iconPath = 'assets/weapon-icons/axe_icon.png';
+        else if (clsLower === 'sword') iconPath = 'assets/weapon-icons/sword_icon.png';
+        else if (clsLower === 'hammer') iconPath = 'assets/weapon-icons/hammer_icon.png';
+        else if (clsLower === 'dagger') iconPath = 'assets/weapon-icons/dagger_icon.png';
+        else if (clsLower === 'spear') iconPath = 'assets/weapon-icons/spear_icon.png';
+        else if (clsLower === 'bow') iconPath = 'assets/weapon-icons/crossbow_icon.png';
+        this.enemy.weapon = { min: weaponMin, max: weaponMax, weaponClass, baseType, iconPath };
         $('screen-hub').classList.add('hidden'); $('screen-combat').classList.remove('hidden'); $('enemy-think').style.display='none';
         this.log = [];
         this.logMessage(`${this.enemy.name} enters the arena!`);
@@ -1124,8 +1164,37 @@ const combat = {
         }, 1500);
     },
     inspectEnemy() {
-        $('modal-inspect').classList.remove('hidden'); $('ins-name').innerText = this.enemy.name;
-        $('ins-lvl').innerText = this.enemy.lvl; $('ins-str').innerText = this.enemy.str; $('ins-atk').innerText = this.enemy.atk; $('ins-def').innerText = this.enemy.def; $('ins-vit').innerText = this.enemy.vit; $('ins-mag').innerText = this.enemy.mag;
+        $('modal-inspect').classList.remove('hidden');
+        const e = this.enemy;
+        $('ins-name').innerText = e.name;
+        $('ins-lvl').innerText = e.lvl;
+        $('ins-str').innerText = e.str;
+        $('ins-atk').innerText = e.atk;
+        $('ins-def').innerText = e.def;
+        $('ins-vit').innerText = e.vit;
+        $('ins-mag').innerText = e.mag;
+
+        const w = e.weapon || null;
+        const dmgEl = $('ins-weapon-dmg');
+        const typeEl = $('ins-weapon-type');
+        const iconEl = $('ins-weapon-icon');
+        if (w) {
+            if (dmgEl) dmgEl.innerText = `${w.min}-${w.max}`;
+            if (typeEl) typeEl.innerText = w.baseType || w.weaponClass || 'Weapon';
+            if (iconEl) {
+                if (w.iconPath) {
+                    iconEl.src = w.iconPath;
+                    iconEl.classList.remove('hidden');
+                } else {
+                    iconEl.src = '';
+                    iconEl.classList.add('hidden');
+                }
+            }
+        } else {
+            if (dmgEl) dmgEl.innerText = '–';
+            if (typeEl) typeEl.innerText = 'Unknown';
+            if (iconEl) { iconEl.src = ''; iconEl.classList.add('hidden'); }
+        }
     },
     updateUI() {
         const e = this.enemy;
@@ -1342,7 +1411,12 @@ const combat = {
         let hit = this.calcHit(e.atk, p.stats.def);
         hit = Math.max(10, Math.min(99, hit - p.getDodgeBonus()));
         if(rng(0,100) <= hit) {
-            let dmg = Math.floor(e.str * 1.5);
+            let dmg;
+            if (e.weapon && typeof e.weapon.min === 'number' && typeof e.weapon.max === 'number') {
+                dmg = rng(e.weapon.min, e.weapon.max);
+            } else {
+                dmg = Math.floor(e.str * 1.5);
+            }
             this.takeDamage(dmg, 'player');
             this.showDmg(dmg, 'player', 'dmg');
             this.logMessage(`${e.name} hits you for <span class="log-dmg">${dmg}</span>.`);

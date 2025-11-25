@@ -20,21 +20,43 @@
     </div>
 
     <!-- CREATION -->
-    <div id="screen-creation" class="menu-screen hidden">
-        <h2>CREATE GLADIATOR</h2>
-        <div style="display:flex; gap:10px; margin:20px;">
-            <div class="avatar-option selected" onclick="game.selectAvatar(0)">🗿</div>
-            <div class="avatar-option" onclick="game.selectAvatar(1)">🦁</div>
-            <div class="avatar-option" onclick="game.selectAvatar(2)">💀</div>
-            <div class="avatar-option" onclick="game.selectAvatar(3)">👺</div>
+    <div id="screen-creation" class="menu-screen hidden" style="flex-direction:column; justify-content:flex-start;">
+        <h2 style="margin-top:80px; margin-bottom:24px;">CREATE GLADIATOR</h2>
+        <div style="display:flex; gap:40px; align-items:flex-start; margin-top:80px;">
+
+            <!-- Left: basic info -->
+            <div style="min-width:260px; padding-right:40px;">
+
+                <div style="display:flex; gap:10px; margin-bottom:20px; justify-content:center;">
+
+                    <div class="avatar-option selected" onclick="game.selectAvatar(0)">🗿</div>
+                    <div class="avatar-option" onclick="game.selectAvatar(1)">🦁</div>
+                    <div class="avatar-option" onclick="game.selectAvatar(2)">💀</div>
+                    <div class="avatar-option" onclick="game.selectAvatar(3)">👺</div>
+                </div>
+                <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12" style="margin-bottom:10px; width:100%;">
+                <select id="inp-class" style="margin-bottom:16px; width:100%;" onchange="game.createCharacter()">
+
+                    <option value="Warrior">Warrior – +8% Dodge, +1 ATK per 3 ATK</option>
+                    <option value="Beserker">Berserker – +10% Crit chance, +1 STR per 3 STR</option>
+                    <option value="Guardian">Protector – +20% Max HP, +1 VIT per 3 VIT, +5% Armor</option>
+                </select>
+                <div style="margin-top:8px; font-size:0.8rem; color:#888;">Distribute your stats on the right, then press ENTER ARENA to start.</div>
+            </div>
+
+            <!-- Divider -->
+            <div style="width:1px; background:#333; opacity:0.7; height:260px; align-self:center;"></div>
+
+            <!-- Right: stat allocation -->
+            <div style="min-width:260px; text-align:right; margin-top:-50px; padding-left:40px;">
+
+                <h3 style="margin-top:0; margin-bottom:6px;">STARTING STATS</h3>
+                <p style="margin:0 0 6px 0; font-size:0.85rem; color:#aaa;">Distribute your starting points.</p>
+                <p style="margin:0 0 10px 0; font-size:1.2rem;">Points: <span id="create-pts" class="text-green">9</span></p>
+                <div id="create-allocator"></div>
+                <button id="btn-create-confirm" class="btn" style="width:100%; margin-top:16px;" onclick="game.confirmCreationStats()">ENTER ARENA</button>
+            </div>
         </div>
-        <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12">
-        <select id="inp-class">
-            <option value="Warrior">Warrior – +8% Dodge, +1 ATK per 3 ATK</option>
-            <option value="Beserker">Berserker – +10% Crit chance, +1 STR per 3 STR</option>
-            <option value="Guardian">Protector – +20% Max HP, +1 VIT per 3 VIT, +5% Armor</option>
-        </select>
-        <button class="btn btn-primary" onclick="game.createCharacter()">Enter Arena</button>
     </div>
 
     <!-- HUB -->
@@ -257,6 +279,13 @@
                 <div>Vitality: <span id="ins-vit" class="text-green">10</span></div>
                 <div>Magicka: <span id="ins-mag" class="text-purple">0</span></div>
                 <hr style="border:0; border-top:1px solid #444; margin:10px 0;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                    <div>
+                        <div>Weapon Damage: <span id="ins-weapon-dmg" class="text-orange">0-0</span></div>
+                        <div style="font-size:0.9rem; color:#aaa;">Type: <span id="ins-weapon-type" class="text-blue">Unknown</span></div>
+                    </div>
+                    <img id="ins-weapon-icon" class="ins-weapon-icon hidden" src="" alt="weapon icon">
+                </div>
                 <div style="color:#888; font-style:italic;" id="ins-desc">"A dangerous foe."</div>
             </div>
         </div>
@@ -280,16 +309,6 @@
             <p>Points: <span id="lvl-pts" class="text-green">3</span></p>
             <div id="stat-allocator"></div>
             <button id="btn-lvl-confirm" class="btn" style="width:100%; margin-top:20px;" onclick="game.confirmLevelUp()">CONFIRM</button>
-        </div>
-    </div>
-
-    <div id="modal-create" class="modal-overlay hidden">
-        <div class="modal-box" style="border-color:var(--accent-blue); max-width:420px;">
-            <h1 class="text-blue">STARTING STATS</h1>
-            <p>Distribute your starting points.</p>
-            <p>Points: <span id="create-pts" class="text-green">9</span></p>
-            <div id="create-allocator"></div>
-            <button id="btn-create-confirm" class="btn" style="width:100%; margin-top:20px;" onclick="game.confirmCreationStats()">ENTER ARENA</button>
         </div>
     </div>
 
