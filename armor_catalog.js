@@ -269,8 +269,9 @@ const ARMORS = [
     val: 8,
     stat: 'Armor',
     price: 80,
-    minShopLevel: 2,
-    statMods: { def: 2 }
+    minShopLevel:1,
+    statMods: { def: 2 },
+    info: 'ananızı skeyim'
   },
   {
     key: 'brigand_vest',

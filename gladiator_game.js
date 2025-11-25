@@ -12,6 +12,21 @@ const BASE_STATS = {
     Guardian: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 }
 };
 
+// Global armor icon resolver so both shop and armor panel can use it
+const getArmorIconPath = (item) => {
+    if (!item || item.type !== 'armor') return '';
+    const slot = (item.slot || '').toLowerCase();
+    if (slot === 'head') return 'assets/images/armor-icons/head_icon.png';
+    if (slot === 'neck') return 'assets/images/armor-icons/neck_icon.png';
+    if (slot === 'shoulders') return 'assets/images/armor-icons/shoulder_icon.png';
+    if (slot === 'chest') return 'assets/images/armor-icons/chest_icon.png';
+    if (slot === 'arms') return 'assets/images/armor-icons/arms_icon.png';
+    if (slot === 'shield') return 'assets/images/armor-icons/shield_icon.png';
+    if (slot === 'thighs') return 'assets/images/armor-icons/thighs_icon.png';
+    if (slot === 'shins') return 'assets/images/armor-icons/shins_icon.png';
+    return '';
+};
+
 const cleanLegendaryWeaponName = (item) => {
     if(!item || item.rarityKey !== 'legendary') return item ? item.name : '';
     const base = item.baseType;
@@ -400,29 +415,6 @@ const game = {
         const previewBox = $('shop-preview');
         const previewBody = $('shop-preview-body');
         const previewIcon = $('shop-preview-icon');
-        const buildPreview = (item, slot) => {
-            if (!item || !previewBody) return;
-            const rarityText = (item.rarity || '').replace('rarity-','');
-            let lines = [];
-            lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
-            const val = (typeof item.val === 'number') ? item.val : 0;
-            lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
-            if (slot) lines.push(`<div><span class="text-blue">Slot:</span> ${slot}</div>`);
-            lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityText}</div>`);
-            previewBody.innerHTML = lines.join('');
-
-            // Update armor icon in tooltip for armor panel
-            if (previewIcon) {
-                const iconPath = getArmorIconPath(item);
-                if (iconPath) {
-                    previewIcon.src = iconPath;
-                    previewIcon.classList.remove('hidden');
-                } else {
-                    previewIcon.src = '';
-                    previewIcon.classList.add('hidden');
-                }
-            }
-        };
         const movePreview = (ev) => {
             if (!previewBox) return;
             const rect = $('game-container').getBoundingClientRect();
@@ -453,7 +445,10 @@ const game = {
             row.innerHTML = `<span>${title}</span><span>${rightHtml}</span>`;
             if (item && previewBox && previewBody) {
                 row.onmouseenter = (ev) => {
-                    buildPreview(item, slot);
+                    // Shop/enventory ile aynı tooltip kartını kullan
+                    if (typeof buildPreviewFromItem === 'function') {
+                        buildPreviewFromItem(item);
+                    }
                     movePreview(ev);
                     previewBox.classList.remove('hidden');
                     previewBox.classList.add('visible');
@@ -722,11 +717,14 @@ const game = {
     },
     openInventory() {
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
+        this.currentInvFilter = this.currentInvFilter || 'all';
         this.renderList(this.player.inventory, 'inv'); $('shop-gold').innerText = this.player.gold;
     },
     renderList(items, mode) {
         this.currentListMode = mode;
         const cont = $('list-container'); cont.innerHTML = '';
+        const header = $('list-header-extra');
+        if (header) header.innerHTML = '';
         if (mode === 'shop') {
             const type = this.currentShopType || 'weapon';
             let title = 'SHOP';
@@ -736,6 +734,29 @@ const game = {
             $('list-title').innerText = title;
         } else {
             $('list-title').innerText = 'INVENTORY';
+            // Inventory filter buttons: All / Weapons / Armors / Trinkets
+            const f = document.createElement('div');
+            f.id = 'inv-filters';
+            f.style.display = 'flex';
+            f.style.gap = '8px';
+            f.style.marginBottom = '8px';
+            const makeBtn = (id, label) => {
+                const b = document.createElement('button');
+                b.className = 'btn btn-xs';
+                b.textContent = label;
+                b.dataset.filter = id;
+                if (this.currentInvFilter === id) b.classList.add('btn-primary');
+                b.onclick = () => {
+                    this.currentInvFilter = id;
+                    this.renderList(this.player.inventory, 'inv');
+                };
+                return b;
+            };
+            f.appendChild(makeBtn('all', 'All'));
+            f.appendChild(makeBtn('weapon', 'Weapons'));
+            f.appendChild(makeBtn('armor', 'Armors'));
+            f.appendChild(makeBtn('trinket', 'Trinkets'));
+            if (header) header.appendChild(f);
         }
 
         const previewBox = $('shop-preview');
@@ -928,10 +949,16 @@ const game = {
             TRINKET_SLOTS.forEach(s => addEquippedRow(s, s.charAt(0).toUpperCase()+s.slice(1)));
         }
 
-        if(items.length === 0 && cont.children.length === 0) {
+        // Apply inventory filter when in inventory mode
+        let listItems = items;
+        if (mode === 'inv' && this.currentInvFilter && this.currentInvFilter !== 'all') {
+            listItems = items.filter(it => it.type === this.currentInvFilter);
+        }
+
+        if(listItems.length === 0 && cont.children.length === 0) {
             cont.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">Empty</div>'; return; }
 
-        items.forEach((item, idx) => {
+        listItems.forEach((item, idx) => {
             const div = document.createElement('div'); div.className = 'item-row';
             let diffHtml = '', statDisplay = '';
             
@@ -997,10 +1024,39 @@ const game = {
                 <button class="${btnClass}" style="padding:5px 10px; font-size:0.8rem;" ${btnState}>${btnTxt}</button>
             `;
 
-            // Hover tooltip for all items (shop or inventory)
+            // Hover tooltip for all items (shop or inventory) + comparison vs equipped
             if (previewBox && previewBody) {
                 div.onmouseenter = (ev) => {
                     buildPreviewFromItem(item);
+                    // Karlastma satrn ekle
+                    const equipped = (item.type === 'weapon')
+                        ? this.player.gear.weapon
+                        : (item.type === 'armor')
+                            ? this.player.gear[item.slot]
+                            : null;
+                    let diffText = '';
+                    let diffClass = '';
+                    if (item.type === 'weapon' && equipped) {
+                        const curAvg = (equipped.min + equipped.max) / 2;
+                        const newAvg = (item.min + item.max) / 2;
+                        const diff = Math.round(newAvg - curAvg);
+                        if (diff !== 0) {
+                            diffClass = diff > 0 ? 'text-green' : 'text-red';
+                            const sign = diff > 0 ? '+' : '';
+                            diffText = `<div class="${diffClass}" style="margin-top:4px;">Compared to equipped: ${sign}${diff} avg damage</div>`;
+                        }
+                    } else if (item.type === 'armor' && equipped) {
+                        const curVal = equipped.val || 0;
+                        const diff = (item.val || 0) - curVal;
+                        if (diff !== 0) {
+                            diffClass = diff > 0 ? 'text-green' : 'text-red';
+                            const sign = diff > 0 ? '+' : '';
+                            diffText = `<div class="${diffClass}" style="margin-top:4px;">Compared to equipped: ${sign}${diff} Armor</div>`;
+                        }
+                    }
+                    if (diffText && previewBody) {
+                        previewBody.innerHTML += diffText;
+                    }
                     movePreview(ev);
                     previewBox.classList.remove('hidden');
                     previewBox.classList.add('visible');
@@ -1017,14 +1073,31 @@ const game = {
                 if(mode === 'shop') {
                     if(this.player.gold >= item.price) {
                         this.player.gold -= item.price;
-                        this.player.inventory.push(item);
+                        // Auto-equip if corresponding slot is empty
+                        const p = this.player;
+                        let autoEquipped = false;
+                        if (item.type === 'weapon' && !p.gear.weapon) {
+                            p.equip(item);
+                            autoEquipped = true;
+                        } else if (item.type === 'armor' && !p.gear[item.slot]) {
+                            p.equip(item);
+                            autoEquipped = true;
+                        } else if (item.type === 'trinket' && !p.gear.trinket1 && !p.gear.trinket2) {
+                            p.equip(item);
+                            autoEquipped = true;
+                        }
+                        if (!autoEquipped) {
+                            this.player.inventory.push(item);
+                        }
                         items.splice(idx, 1);
                         this.renderList(items, mode);
                         $('shop-gold').innerText = this.player.gold;
+                        this.updateHubUI();
                     }
                 } else {
                     this.player.equip(item);
                     this.renderList(this.player.inventory, mode);
+                    this.updateHubUI();
                 }
             };
             cont.appendChild(div);
