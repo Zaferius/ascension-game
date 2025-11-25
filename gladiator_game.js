@@ -5,6 +5,7 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const AVATARS = ['🗿', '🦁', '💀', '👺'];
 const SAVE_KEY = 'arenaV7_saves';
 const ARMOR_SLOTS = ['head', 'neck', 'shoulders', 'chest', 'arms', 'shield', 'thighs', 'shins'];
+const TRINKET_SLOTS = ['trinket1', 'trinket2'];
 const BASE_STATS = {
     Warrior:  { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 },
     Beserker: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 },
@@ -74,6 +75,28 @@ class ItemSystem {
             id: Date.now() + Math.random()
         };
     }
+    static createTrinket(lvl) {
+        const rarity = this.getRarity();
+
+        let rarityKey = 'common';
+        if (rarity.color === 'rarity-uncommon') rarityKey = 'uncommon';
+        else if (rarity.color === 'rarity-rare') rarityKey = 'rare';
+        else if (rarity.color === 'rarity-epic') rarityKey = 'epic';
+        else if (rarity.color === 'rarity-legendary') rarityKey = 'legendary';
+
+        let pool = (typeof TRINKETS !== 'undefined')
+            ? TRINKETS.filter(t => t.rarityKey === rarityKey && (t.minShopLevel || 1) <= lvl)
+            : [];
+        if (pool.length === 0 && typeof TRINKETS !== 'undefined') pool = TRINKETS;
+        if (pool.length === 0) return null;
+
+        const template = pool[rng(0, pool.length - 1)];
+
+        return {
+            ...template,
+            id: Date.now() + Math.random()
+        };
+    }
 }
 
 class Player {
@@ -84,6 +107,7 @@ class Player {
         this.inventory = [];
         this.gear = { weapon: null };
         ARMOR_SLOTS.forEach(s => this.gear[s] = null);
+        TRINKET_SLOTS.forEach(s => this.gear[s] = null);
         this.wins = 0; this.pts = 0;
     }
     // --- Class passives + gear stat mods helpers ---
@@ -112,6 +136,15 @@ class Player {
         let v = this.stats.vit + this.getGearStatBonus('vit');
         if (this.class === 'Guardian') v += Math.floor(v / 3); // +1 VIT per 3 VIT
         return v;
+    }
+    getEffectiveDef() {
+        return this.stats.def + this.getGearStatBonus('def');
+    }
+    getEffectiveMag() {
+        return this.stats.mag + this.getGearStatBonus('mag');
+    }
+    getEffectiveChr() {
+        return (this.stats.chr ?? 0) + this.getGearStatBonus('chr');
     }
     getHpMultiplier() {
         return (this.class === 'Guardian') ? 1.2 : 1.0; // +20% max HP
@@ -145,7 +178,18 @@ class Player {
         return { min: 2 + strBonus, max: 4 + strBonus };
     }
     equip(item) {
-        const slot = item.type === 'weapon' ? 'weapon' : item.slot;
+        let slot;
+        if (item.type === 'weapon') {
+            slot = 'weapon';
+        } else if (item.type === 'armor') {
+            slot = item.slot;
+        } else if (item.type === 'trinket') {
+            // Önce boş bir trinket slotu ara, yoksa trinket1'i değiştir
+            const empty = TRINKET_SLOTS.find(s => !this.gear[s]);
+            slot = empty || 'trinket1';
+        } else {
+            return;
+        }
         if(this.gear[slot]) this.inventory.push(this.gear[slot]);
         this.gear[slot] = item;
         this.inventory = this.inventory.filter(i => i.id !== item.id);
@@ -232,11 +276,19 @@ const game = {
         this.renderCreateUI();
     },
     generateShopStock() {
-        this.shopStock.weapon=[]; this.shopStock.armor=[];
+        this.shopStock.weapon = [];
+        this.shopStock.armor = [];
+        this.shopStock.trinket = [];
         const lvl = this.player.level;
         for(let i=0; i<8; i++) this.shopStock.weapon.push(ItemSystem.createWeapon(lvl));
         for(let i=0; i<8; i++) this.shopStock.armor.push(ItemSystem.createArmor(lvl));
-        this.sortShop(this.shopStock.weapon); this.sortShop(this.shopStock.armor);
+        for(let i=0; i<6; i++) {
+            const t = ItemSystem.createTrinket(lvl);
+            if (t) this.shopStock.trinket.push(t);
+        }
+        this.sortShop(this.shopStock.weapon);
+        this.sortShop(this.shopStock.armor);
+        this.sortShop(this.shopStock.trinket);
         this.lastShopReset = this.player.wins;
     },
     addTestGold(amount = 100) {
@@ -310,7 +362,11 @@ const game = {
         const mode = this.currentListMode || 'shop';
         if (mode === 'shop') {
             const type = this.currentShopType || 'weapon';
-            const list = type === 'weapon' ? this.shopStock.weapon : this.shopStock.armor;
+            let list;
+            if (type === 'weapon') list = this.shopStock.weapon;
+            else if (type === 'armor') list = this.shopStock.armor;
+            else if (type === 'trinket') list = this.shopStock.trinket;
+            else list = this.shopStock.weapon;
             this.sortShop(list);
             this.renderList(list, 'shop'); $('shop-gold').innerText = this.player.gold;
         } else if (mode === 'inv' && this.player) {
@@ -435,21 +491,28 @@ const game = {
         const effStr = p.getEffectiveStr();
         const effAtk = p.getEffectiveAtk();
         const effVit = p.getEffectiveVit();
+        const effDef = p.getEffectiveDef();
+        const effMag = p.getEffectiveMag();
+        const effChr = p.getEffectiveChr();
         const strBonus = effStr - p.stats.str;
         const atkBonus = effAtk - p.stats.atk;
         const vitBonus = effVit - p.stats.vit;
+        const defBonus = effDef - p.stats.def;
+        const magBonus = effMag - p.stats.mag;
+        const chrBase = (p.stats.chr ?? 0);
+        const chrBonus = effChr - chrBase;
 
         $('ui-stats').innerHTML = `
             <div class="stat-row"><span>Strength</span> <span class="text-orange">${effStr}${strBonus>0?` <small>(base ${p.stats.str} +${strBonus})</small>`:''} <button class="btn-xs" onclick="game.debugModStat('str',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('str',1)">+</button></span></div>
             <div class="stat-row"><span>Attack</span> <span class="text-red">${effAtk}${atkBonus>0?` <small>(base ${p.stats.atk} +${atkBonus})</small>`:''} <button class="btn-xs" onclick="game.debugModStat('atk',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('atk',1)">+</button></span></div>
-            <div class="stat-row"><span>Defence</span> <span class="text-blue">${p.stats.def} <button class="btn-xs" onclick="game.debugModStat('def',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('def',1)">+</button></span></div>
+            <div class="stat-row"><span>Defence</span> <span class="text-blue">${effDef}${defBonus>0?` <small>(base ${p.stats.def} +${defBonus})</small>`:''} <button class="btn-xs" onclick="game.debugModStat('def',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('def',1)">+</button></span></div>
             <div class="stat-row"><span>Vitality</span> <span class="text-green">${effVit}${vitBonus>0?` <small>(base ${p.stats.vit} +${vitBonus})</small>`:''} <button class="btn-xs" onclick="game.debugModStat('vit',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('vit',1)">+</button></span></div>
-            <div class="stat-row"><span>Magicka</span> <span class="text-purple">${p.stats.mag} <button class="btn-xs" onclick="game.debugModStat('mag',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('mag',1)">+</button></span></div>
-            <div class="stat-row"><span>Charisma</span> <span class="text-gold">${(p.stats.chr ?? 0)} <button class="btn-xs" onclick="game.debugModStat('chr',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('chr',1)">+</button></span></div>
+            <div class="stat-row"><span>Magicka</span> <span class="text-purple">${effMag}${magBonus>0?` <small>(base ${p.stats.mag} +${magBonus})</small>`:''} <button class="btn-xs" onclick="game.debugModStat('mag',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('mag',1)">+</button></span></div>
+            <div class="stat-row"><span>Charisma</span> <span class="text-gold">${effChr}${chrBonus>0?` <small>(base ${chrBase} +${chrBonus})</small>`:''} <button class="btn-xs" onclick="game.debugModStat('chr',-1)">-</button><button class="btn-xs" onclick="game.debugModStat('chr',1)">+</button></span></div>
             <div style="margin-top:10px; color:#fff; font-size:0.8rem; text-align:center;">Health: ${p.getMaxHp()} | <span class="text-shield">Armor: ${arm}</span></div>
             <div style="margin-top:4px; color:#ff9100; font-size:0.8rem; text-align:center;">Melee Damage: ${dmg.min}-${dmg.max}</div>
         `;
-        
+
         // Equipment Lists
         const renderSlot = (slot, title) => {
             const item = p.gear[slot];
@@ -470,6 +533,10 @@ const game = {
                     const spanId = (slot === 'weapon') ? 'hub-weapon-name' : '';
                     const idAttr = spanId ? ` id="${spanId}"` : '';
                     display = `<span${idAttr} class="${item.rarity}">${baseName}${tags}</span>${dmgText}`;
+                } else if (item.type === 'trinket') {
+                    const spanId = (slot === 'trinket1') ? 'hub-trinket1-name' : (slot === 'trinket2') ? 'hub-trinket2-name' : '';
+                    const idAttr = spanId ? ` id="${spanId}"` : '';
+                    display = `<span${idAttr} class="${item.rarity}">${item.name}</span>`;
                 } else {
                     const valText = (typeof item.val === 'number') ? ` <span style="color:#888; font-size:0.8rem;">(+${item.val})</span>` : '';
                     display = `<span class="${item.rarity}">${item.name}</span>${valText}`;
@@ -495,6 +562,11 @@ const game = {
                 </span>
             </div>
         `;
+
+        // Trinkets section (2 slot)
+        html += `<div class="eq-header">TRINKETS</div>`;
+        html += renderSlot('trinket1', 'Trinket 1');
+        html += renderSlot('trinket2', 'Trinket 2');
         // Attach click handler and hub weapon tooltip after injecting HTML
         setTimeout(() => {
             const btn = document.querySelector('#ui-equip .stat-row button');
@@ -554,6 +626,75 @@ const game = {
                     previewBox.classList.remove('visible');
                 };
             }
+
+            // Hub trinket tooltips (use same preview box)
+            const setupTrinketHover = (elId, trinket) => {
+                const el = $(elId);
+                if (!el || !trinket || !previewBox || !previewBody) return;
+                const buildPreview = () => {
+                    const rarityText = (trinket.rarity || '').replace('rarity-','');
+                    const lines = [];
+                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${trinket.rarity}">${trinket.name}</div>`);
+                    if (trinket.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${trinket.baseType}</div>`);
+                    if (trinket.statMods) {
+                        Object.entries(trinket.statMods).forEach(([k,v]) => {
+                            lines.push(`<div><span class="text-gold">${k.toUpperCase()}:</span> ${v >= 0 ? '+' : ''}${v}</div>`);
+                        });
+                    }
+                    if (typeof trinket.goldBonus === 'number') {
+                        lines.push(`<div><span class="text-gold">Gold Bonus:</span> +${Math.round(trinket.goldBonus*100)}%</div>`);
+                    }
+                    if (typeof trinket.xpBonus === 'number') {
+                        lines.push(`<div><span class="text-purple">XP Bonus:</span> +${Math.round(trinket.xpBonus*100)}%</div>`);
+                    }
+                    const rarityLabel = rarityText || 'unknown';
+                    lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityLabel}</div>`);
+                    if (trinket.info) {
+                        const infoClass = trinket.infoColor || 'text-gold';
+                        lines.push(`<div style="margin-top:6px; font-size:0.8rem;" class="${infoClass}">${trinket.info}</div>`);
+                    }
+                    previewBody.innerHTML = lines.join('');
+
+                    // Handle item type icon (weapon / armor)
+                    if (previewIcon) {
+                        if (trinket.iconPath) {
+                            previewIcon.src = trinket.iconPath;
+                            previewIcon.classList.remove('hidden');
+                        } else {
+                            previewIcon.src = '';
+                            previewIcon.classList.add('hidden');
+                        }
+                    }
+                };
+                const movePreview = (ev) => {
+                    const rect = $('game-container').getBoundingClientRect();
+                    const offsetX = 28, offsetY = 25;
+                    let x = ev.clientX - rect.left + offsetX;
+                    let y = ev.clientY - rect.top + offsetY;
+                    const maxX = rect.width - 340;
+                    const maxY = rect.height - 160;
+                    x = Math.max(10, Math.min(maxX, x));
+                    y = Math.max(10, Math.min(maxY, y));
+                    previewBox.style.left = x + 'px';
+                    previewBox.style.top = y + 'px';
+                };
+
+                el.onmouseenter = (ev) => {
+                    buildPreview();
+                    movePreview(ev);
+                    previewBox.classList.remove('hidden');
+                    previewBox.classList.add('visible');
+                };
+                el.onmousemove = (ev) => {
+                    if (previewBox.classList.contains('visible')) movePreview(ev);
+                };
+                el.onmouseleave = () => {
+                    previewBox.classList.remove('visible');
+                };
+            };
+
+            setupTrinketHover('hub-trinket1-name', p.gear.trinket1);
+            setupTrinketHover('hub-trinket2-name', p.gear.trinket2);
         }, 0);
         
         $('ui-equip').innerHTML = html;
@@ -563,11 +704,17 @@ const game = {
         if(this.player.wins - this.lastShopReset >= 4) this.generateShopStock();
         // remember which category is currently open so sorting works on the right list
         this.currentShopType = type;
-        let list = type === 'weapon' ? this.shopStock.weapon : this.shopStock.armor;
+        let list;
+        if (type === 'weapon') list = this.shopStock.weapon;
+        else if (type === 'armor') list = this.shopStock.armor;
+        else if (type === 'trinket') list = this.shopStock.trinket;
+        else list = this.shopStock.weapon;
         // if for any reason the list is empty (e.g. loaded save), regenerate shop stock once
         if(!list || list.length === 0) {
             this.generateShopStock();
-            list = type === 'weapon' ? this.shopStock.weapon : this.shopStock.armor;
+            if (type === 'weapon') list = this.shopStock.weapon;
+            else if (type === 'armor') list = this.shopStock.armor;
+            else if (type === 'trinket') list = this.shopStock.trinket;
         }
         this.sortShop(list);
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
@@ -582,7 +729,11 @@ const game = {
         const cont = $('list-container'); cont.innerHTML = '';
         if (mode === 'shop') {
             const type = this.currentShopType || 'weapon';
-            $('list-title').innerText = (type === 'weapon') ? 'WEAPONSMITH' : 'ARMORY';
+            let title = 'SHOP';
+            if (type === 'weapon') title = 'WEAPONSMITH';
+            else if (type === 'armor') title = 'ARMORY';
+            else if (type === 'trinket') title = 'TRINKET SHOP';
+            $('list-title').innerText = title;
         } else {
             $('list-title').innerText = 'INVENTORY';
         }
@@ -606,6 +757,9 @@ const game = {
             if (item.type === 'armor') {
                 if (item.slot) return item.slot.charAt(0).toUpperCase() + item.slot.slice(1);
                 return 'Armor';
+            }
+            if (item.type === 'trinket') {
+                return 'Trinket';
             }
             return '';
         };
@@ -734,9 +888,16 @@ const game = {
                     if(baseLower) parts.push(`[${baseLower}]`);
                     if (parts.length) nameSuffix = ` <span style="color:#666; font-size:0.75rem;">${parts.join(' ')}</span>`;
                 }
-                const statDisplay = isWeapon
-                    ? `Dmg: ${equipped.min}-${equipped.max}`
-                    : `Armor: ${equipped.val}`;
+                let statDisplay;
+                if (isWeapon) {
+                    statDisplay = `Dmg: ${equipped.min}-${equipped.max}`;
+                } else if (equipped.type === 'armor') {
+                    statDisplay = `Armor: ${equipped.val}`;
+                } else if (equipped.type === 'trinket') {
+                    statDisplay = 'Trinket';
+                } else {
+                    statDisplay = '';
+                }
                 const slotTag = !isWeapon ? ` <span style="color:#666; font-size:0.7rem">[${slot}]</span>` : '';
                 const row = document.createElement('div');
                 row.className = 'item-row';
@@ -764,6 +925,7 @@ const game = {
 
             addEquippedRow('weapon', 'Melee Weapon');
             ARMOR_SLOTS.forEach(s => addEquippedRow(s, s.charAt(0).toUpperCase()+s.slice(1)));
+            TRINKET_SLOTS.forEach(s => addEquippedRow(s, s.charAt(0).toUpperCase()+s.slice(1)));
         }
 
         if(items.length === 0 && cont.children.length === 0) {
@@ -779,12 +941,15 @@ const game = {
                 const diff = item.max - curMax;
                 diffHtml = diff > 0 ? `<span class="diff-pos">(+${diff})</span>` : (diff < 0 ? `<span class="diff-neg">(${diff})</span>` : '');
                 statDisplay = `Dmg: ${item.min}-${item.max}`;
-            } else {
+            } else if (item.type === 'armor') {
                 const current = this.player.gear[item.slot];
                 const curVal = current ? current.val : 0;
                 const diff = item.val - curVal;
                 diffHtml = diff > 0 ? `<span class="diff-pos">(+${diff})</span>` : (diff < 0 ? `<span class="diff-neg">(${diff})</span>` : '');
                 statDisplay = `Armor: ${item.val}`;
+            } else if (item.type === 'trinket') {
+                // Trinketlerde düz stat gösterimi yok, tooltipten okunacak
+                statDisplay = 'Trinket';
             }
 
             const cls = item.type === 'weapon' ? (item.weaponClass || '').toLowerCase() : '';
@@ -1770,9 +1935,25 @@ const combat = {
         this.updateUI();
         const baseGold = 20 + (this.enemy.lvl * 10); const baseXp = 50 + (this.enemy.lvl * 15);
         const chr = p.stats.chr || 0;
-        const rewardMult = Math.min(1.6, 1 + chr * 0.03); // each CHR = +3% rewards, max +60%
-        const gold = Math.floor(baseGold * rewardMult);
-        const xp = Math.floor(baseXp * rewardMult);
+        let rewardMult = 1 + chr * 0.03; // each CHR = +3%
+
+        // Trinketlerden gelen ekstra gold/xp çarpanları
+        let goldBonus = 0;
+        let xpBonus = 0;
+        if (p.gear) {
+            TRINKET_SLOTS.forEach(slot => {
+                const t = p.gear[slot];
+                if (!t) return;
+                if (typeof t.goldBonus === 'number') goldBonus += t.goldBonus;
+                if (typeof t.xpBonus === 'number') xpBonus += t.xpBonus;
+            });
+        }
+
+        const goldMult = Math.min(2.0, rewardMult + goldBonus); // toplam max +100%
+        const xpMult = Math.min(2.0, rewardMult + xpBonus);
+
+        const gold = Math.floor(baseGold * goldMult);
+        const xp = Math.floor(baseXp * xpMult);
         p.gold += gold; p.xp += xp;
         $('modal-victory').classList.remove('hidden');
         this.animateVal('vic-gold',0,gold,1000); this.animateVal('vic-xp',0,xp,1000);

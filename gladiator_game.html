@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arena Legends v7.0</title>
     <link rel="stylesheet" href="gladiator_game.css">
-    <script src="item_catalogs.js"></script>
+    <script src="weapon_catalog.js"></script>
+    <script src="armor_catalog.js"></script>
+    <script src="trinket_catalog.js"></script>
+    <script src="gladiator_game.js"></script>
 
 </head>
 <body>
@@ -95,6 +98,7 @@
                     <button class="btn btn-primary" onclick="combat.init()">⚔️ FIGHT ARENA</button>
                     <button class="btn" onclick="game.openShop('weapon')">🔨 Weaponsmith</button>
                     <button class="btn" onclick="game.openShop('armor')">🛡️ Armory</button>
+                    <button class="btn" onclick="game.openShop('trinket')">🔮 Trinket Shop</button>
                     <button class="btn" onclick="game.openInventory()">🎒 Inventory</button>
                     <button class="btn" style="background:#4a148c; border-color:#7b1fa2;" onclick="blackjack.open()">🎲 GAMBLE</button>
                     <button class="btn" style="background:#2a2a2a" onclick="game.saveGameManually()">💾 Save</button>
