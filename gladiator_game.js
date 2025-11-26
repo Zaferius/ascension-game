@@ -4,6 +4,17 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const AVATARS = ['🗿', '🦁', '💀', '👺'];
 
+// In-game portrait images for combat
+const PLAYER_AVATAR_IMG = 'assets/images/ingame-avatars/player.jpeg';
+const ENEMY_AVATARS = {
+    bandit:   'assets/images/ingame-avatars/bandit1.jpeg',
+    goblin:   'assets/images/ingame-avatars/goblin1.jpeg',
+    marauder: 'assets/images/ingame-avatars/marauder1.jpeg',
+    orc:      'assets/images/ingame-avatars/orc1.jpeg',
+    paladin:  'assets/images/ingame-avatars/paladin1.jpeg',
+    skeleton: 'assets/images/ingame-avatars/skeleton1.jpeg'
+};
+
 const INTRO_SCRIPT = {
     textColor: '#E8E2C8',
     scenes: [
@@ -1647,36 +1658,26 @@ const combat = {
             logEl.innerHTML = '';
             logEl.classList.remove('expanded');
         }
-        const s = p.level;
-        const enemyName = ["Orc", "Goblin", "Bandit", "Skeleton", "Troll"][rng(0,4)];
+        // Enemy template + stats from enemy_config.js
+        const enemyGen = (typeof generateEnemyTemplateForLevel === 'function')
+            ? generateEnemyTemplateForLevel(p.level)
+            : null;
+        const tpl = enemyGen ? enemyGen.template : null;
+        const eStats = enemyGen ? enemyGen.stats : { str: 5, atk: 5, def: 3, vit: 3 };
+        const s = enemyGen ? enemyGen.level : p.level;
+        const enemyName = tpl ? tpl.name : 'Bandit';
 
-        // Düşman statlarını seviye ile orantılı hesapla
-        // Basit kural: toplam STR+ATK+DEF+VIT = 9 + (level - 1) * 3
-        const totalPts = 9 + 3 * Math.max(0, s - 1);
-        // Temel ağırlıklar (farklı düşman tipleri için ufak varyasyon)
-        let wStr = 3, wAtk = 3, wDef = 1, wVit = 2;
-        if (enemyName === 'Orc' || enemyName === 'Troll') { wStr = 4; wAtk = 3; wDef = 1; wVit = 2; }
-        else if (enemyName === 'Goblin') { wStr = 2; wAtk = 4; wDef = 1; wVit = 2; }
-        else if (enemyName === 'Skeleton') { wStr = 2; wAtk = 3; wDef = 3; wVit = 1; }
-        else if (enemyName === 'Bandit') { wStr = 3; wAtk = 3; wDef = 2; wVit = 2; }
-
-        const wSum = wStr + wAtk + wDef + wVit;
-        // Toplam puanı ağırlıklara göre bölüştür
-        let baseStr = Math.max(0, Math.floor(totalPts * wStr / wSum));
-        let baseAtk = Math.max(0, Math.floor(totalPts * wAtk / wSum));
-        let baseDef = Math.max(0, Math.floor(totalPts * wDef / wSum));
-        let baseVit = Math.max(0, Math.floor(totalPts * wVit / wSum));
-        let curSum = baseStr + baseAtk + baseDef + baseVit;
-        let rem = totalPts - curSum;
-        // Kalan puanları STR/ATK/VIT'e dağıt
-        const order = ['str','atk','vit'];
-        const stats = { str: baseStr, atk: baseAtk, def: baseDef, vit: baseVit };
-        let oi = 0;
-        while (rem > 0) {
-            const key = order[oi % order.length];
-            stats[key] += 1;
-            rem--;
-            oi++;
+        // Combat portraits: player + enemy
+        const playerAvatarEl = $('c-player-avatar');
+        if (playerAvatarEl) {
+            playerAvatarEl.src = PLAYER_AVATAR_IMG;
+        }
+        const enemyAvatarEl = $('c-enemy-avatar');
+        if (enemyAvatarEl) {
+            const avatarKey = (typeof getEnemyAvatarKey === 'function')
+                ? getEnemyAvatarKey(tpl)
+                : (tpl && tpl.avatarKey ? tpl.avatarKey : (enemyName || '').toLowerCase());
+            enemyAvatarEl.src = ENEMY_AVATARS[avatarKey] || '';
         }
 
         // Temel enemy statları (HP formülü şimdilik eskisi gibi kalsın)
@@ -1685,21 +1686,17 @@ const combat = {
             lvl: s,
             maxHp: 0,
             hp: 0,
-            str: stats.str,
-            atk: stats.atk,
-            def: stats.def,
-            vit: stats.vit,
+            str: eStats.str,
+            atk: eStats.atk,
+            def: eStats.def,
+            vit: eStats.vit,
             mag: 0,
             armor: 0,
             maxArmor: 0
         };
 
         // Enemy silahını merkezi WEAPONS kataloğundan seç
-        let desiredClass = 'Sword';
-        if (enemyName === 'Orc' || enemyName === 'Troll') desiredClass = 'Axe';
-        else if (enemyName === 'Goblin') desiredClass = 'Dagger';
-        else if (enemyName === 'Skeleton') desiredClass = 'Spear';
-        else if (enemyName === 'Bandit') desiredClass = 'Sword';
+        let desiredClass = (tpl && tpl.weaponClass) ? tpl.weaponClass : 'Sword';
 
         let enemyWeapon = null;
         if (typeof WEAPONS !== 'undefined') {

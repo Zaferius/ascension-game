@@ -159,6 +159,36 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
 .combat-unit { position: absolute; width: 340px; }
 .enemy-unit { top: 70px; right: 50px; text-align: right; }
 .player-unit { bottom: 170px; left: 50px; }
+/* Combat avatars (player/enemy portraits) */
+.combat-avatar {
+    position:absolute;
+    width:140px;
+    height:140px;
+    border-radius:12px;
+    border:2px solid #555;
+    background:#111;
+    box-shadow:0 0 18px rgba(0,0,0,0.9);
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:25;
+}
+.combat-avatar img {
+    width:150%;
+    height:150%;
+    object-fit:cover;
+}
+/* Player portrait: above player HP/armor bars on the left */
+.combat-avatar-player {
+    left:50px;
+    bottom:310px;
+}
+/* Enemy portrait: below enemy HP/armor bars on the right */
+.combat-avatar-enemy {
+    right:50px;
+    top:200px;
+}
 /* Blood vignette when player is hit */
 #blood-vignette {
     position:absolute;

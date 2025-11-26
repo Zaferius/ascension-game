@@ -8,6 +8,7 @@
     <script src="weapon_catalog.js"></script>
     <script src="armor_catalog.js"></script>
     <script src="trinket_catalog.js"></script>
+    <script src="enemy_config.js"></script>
     <script src="ui_audio.js"></script>
     <script src="gladiator_game.js"></script>
 
@@ -131,6 +132,11 @@
     <div id="screen-combat" class="hidden">
         <div id="turn-indicator" style="text-align:center; font-size:2.5rem; margin-top:5px; text-shadow:0 0 15px rgba(0,0,0,0.8);" class="text-green">PLAYER TURN</div>
 
+        <!-- Enemy avatar portrait -->
+        <div class="combat-avatar combat-avatar-enemy">
+            <img id="c-enemy-avatar" src="" alt="Enemy" />
+        </div>
+
         <!-- ENEMY -->
         <div class="combat-unit enemy-unit" onclick="combat.inspectEnemy()">
             <div style="font-size:1.4rem;">
@@ -167,7 +173,6 @@
 
         <!-- PLAYER -->
         <div class="combat-unit player-unit">
-            <div id="c-player-name" style="font-size:1.4rem;">Player</div>
             <div class="bar-group">
                 <!-- Armor Bar -->
                 <div class="bar-base" style="height:24px;">
@@ -180,12 +185,18 @@
                     <div id="c-player-hp" class="bar-fill" style="background:var(--accent-red);"></div>
                 </div>
             </div>
+            <div id="c-player-name" style="font-size:1.1rem; margin-top:6px; text-align:left;">Player</div>
             <div id="status-row" style="margin-top:4px; font-size:0.8rem; color:#888; min-height:18px;">
                 <span id="status-icons"></span>
             </div>
             <div id="resist-row" style="margin-top:2px; font-size:0.8rem; color:#888; min-height:18px;">
                 <span id="resist-icons"></span>
             </div>
+        </div>
+
+        <!-- Player avatar portrait -->
+        <div class="combat-avatar combat-avatar-player">
+            <img id="c-player-avatar" src="" alt="Player" />
         </div>
 
         <!-- ACTIONS -->
