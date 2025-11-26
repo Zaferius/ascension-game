@@ -45,20 +45,20 @@
             <!-- Left: basic info -->
             <div style="min-width:260px; padding-right:40px;">
 
-                <div style="display:flex; gap:10px; margin-bottom:20px; justify-content:center;">
+                <div class="create-basic-row">
+                    <div class="create-avatar">
+                        <img src="assets/images/ingame-avatars/player.png" alt="Gladiator Avatar">
+                    </div>
+                    <div class="create-basic-fields">
+                        <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12" style="margin-bottom:10px; width:100%;">
+                        <select id="inp-class" style="margin-bottom:16px; width:100%;" onchange="game.createCharacter()">
 
-                    <div class="avatar-option selected" onclick="game.selectAvatar(0)">🗿</div>
-                    <div class="avatar-option" onclick="game.selectAvatar(1)">🦁</div>
-                    <div class="avatar-option" onclick="game.selectAvatar(2)">💀</div>
-                    <div class="avatar-option" onclick="game.selectAvatar(3)">👺</div>
+                            <option value="Warrior">Warrior – +8% Dodge, +1 ATK per 3 ATK</option>
+                            <option value="Beserker">Berserker – +10% Crit chance, +1 STR per 3 STR</option>
+                            <option value="Guardian">Protector – +20% Max HP, +1 VIT per 3 VIT, +5% Armor</option>
+                        </select>
+                    </div>
                 </div>
-                <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12" style="margin-bottom:10px; width:100%;">
-                <select id="inp-class" style="margin-bottom:16px; width:100%;" onchange="game.createCharacter()">
-
-                    <option value="Warrior">Warrior – +8% Dodge, +1 ATK per 3 ATK</option>
-                    <option value="Beserker">Berserker – +10% Crit chance, +1 STR per 3 STR</option>
-                    <option value="Guardian">Protector – +20% Max HP, +1 VIT per 3 VIT, +5% Armor</option>
-                </select>
                 <div style="margin-top:8px; font-size:0.8rem; color:#888;">Distribute your stats on the right, then press ENTER ARENA to start.</div>
             </div>
 
@@ -119,6 +119,7 @@
                     <button class="btn" onclick="game.openShop('armor')">🛡️ Armory</button>
                     <button class="btn" onclick="game.openShop('trinket')">🔮 Trinket Shop</button>
                     <button class="btn" onclick="game.openInventory()">🎒 Inventory</button>
+                    <button class="btn" onclick="game.openCodex('weapon')">📜 Item Index</button>
                     <button class="btn" style="background:#4a148c; border-color:#7b1fa2;" onclick="blackjack.open()">🎲 GAMBLE</button>
                     <button class="btn" style="background:#2a2a2a" onclick="game.saveGameManually()">💾 Save</button>
                 </div>
@@ -151,7 +152,7 @@
                 </div>
                 <!-- Enemy HP Bar -->
                 <div class="bar-base enemy-bar-container" style="border-color:#333;">
-                    <div class="bar-text" id="c-enemy-hp-text">100/100</div>
+                    <div class="bar-text" id="c-enemy-hp-text">12/12</div>
                     <div id="c-enemy-hp" class="bar-fill" style="background:var(--accent-red);"></div>
                 </div>
             </div>
@@ -181,7 +182,7 @@
                 </div>
                 <!-- HP Bar -->
                 <div class="bar-base">
-                    <div class="bar-text" id="c-player-hp-text">100/100</div>
+                    <div class="bar-text" id="c-player-hp-text">12/12</div>
                     <div id="c-player-hp" class="bar-fill" style="background:var(--accent-red);"></div>
                 </div>
             </div>
@@ -227,6 +228,29 @@
                 <div>ACTION</div>
             </div>
             <div id="list-container" class="item-list"></div>
+        </div>
+        <button class="btn" style="margin-top:20px;" onclick="game.showHub()">Back to Hub</button>
+    </div>
+
+    <div id="screen-codex" class="menu-screen hidden" style="justify-content: flex-start; padding-top:40px;">
+        <div style="display:flex; justify-content:space-between; width:90%; align-items:center;">
+            <h2 id="codex-title" style="margin:0;">ITEM INDEX</h2>
+        </div>
+        <div style="width:95%; margin-top:10px;">
+            <div id="codex-filters" style="display:flex; gap:8px; margin-bottom:8px;">
+                <button class="btn btn-xs" data-filter="weapon" onclick="game.setCodexFilter('weapon')">Weapons</button>
+                <button class="btn btn-xs" data-filter="armor" onclick="game.setCodexFilter('armor')">Armor</button>
+                <button class="btn btn-xs" data-filter="trinket" onclick="game.setCodexFilter('trinket')">Trinkets</button>
+            </div>
+            <div class="shop-header">
+                <div>ITEM</div>
+                <div>RARITY</div>
+                <div>TYPE</div>
+                <div>LEVEL</div>
+                <div>PRICE</div>
+                <div>-</div>
+            </div>
+            <div id="codex-container" class="item-list"></div>
         </div>
         <button class="btn" style="margin-top:20px;" onclick="game.showHub()">Back to Hub</button>
     </div>

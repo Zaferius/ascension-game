@@ -83,8 +83,8 @@ body {
     background: #ffffff;
     background: linear-gradient(
         to top,
-        rgb(0, 255, 234) 20%,
-        rgb(0, 255, 136) 60%
+        #c5c68c 20%,
+        #C6B08C 60%
     );
 
     -webkit-background-clip: text;
@@ -126,6 +126,10 @@ input, select {
     outline: none;
 }
 input:focus, select:focus { border-color: var(--accent-green) !important; }
+.create-basic-row { display:flex; align-items:center; gap:16px; }
+.create-avatar { width:150px; height:150px; border-radius:12px; overflow:hidden; border:2px solid #555; box-shadow:0 0 18px rgba(0,0,0,0.8); background:#111; display:flex; align-items:center; justify-content:center; }
+.create-avatar img { width:120%; height:120%; object-fit:cover; }
+.create-basic-fields { flex:1; display:flex; flex-direction:column; }
 
 /* --- BUTTONS --- */
 .btn {
@@ -139,7 +143,9 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
 .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #111; }
 .btn:disabled { background: #1a1a1a; color: #555; cursor: not-allowed; box-shadow: none; border-color: #222; }
 .btn-primary { background: var(--accent-green); color: #000; border: none; }
-.btn-primary:hover:not(:disabled) { background: #69f0ae; }
+.btn-primary:hover:not(:disabled) { background: #80715a; }
+/* Start screen New Game button tint */
+#screen-start .btn-primary { background: #C6B08C; }
 
 /* Small Unequip Button */
 .btn-xs { padding: 2px 6px; font-size: 0.7rem; margin-left: 5px; border: 1px solid #444; background: #222; color: #f44; }
@@ -166,7 +172,7 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
 .c-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
 
 /* --- COMBAT ENTITIES --- */
-#screen-combat { position: relative; padding: 20px; height: 100%; font-family: var(--font-main); }
+#screen-combat { position: relative; padding: 20px; height: 100%; font-family: var(--font-main); background: url('assets/images/bg/bg-fight.jpeg') center center / cover no-repeat; }
 .combat-unit { position: absolute; width: 340px; }
 .enemy-unit { top: 70px; right: 50px; text-align: right; }
 .player-unit { bottom: 170px; left: 50px; }
@@ -287,6 +293,7 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
 
 /* --- HUB & SHOP --- */
 .menu-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.4s ease; }
+#screen-start { background: url('assets/images/bg/bg-main-menu.jpeg') center center / cover no-repeat; }
 .hub-top { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 20px 30px; background: rgba(0,0,0,0.4); border-bottom: 1px solid #333; }
 .hub-content { display: flex; width: 100%; height: 100%; }
 .hub-sidebar { width: 32%; padding: 16px 18px; background: rgba(255,255,255,0.02); border-right: 1px solid #333; overflow-y: auto; }
