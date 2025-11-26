@@ -36,3 +36,5 @@ UISafe framing: allow room around the head so the whole portrait fits inside a s
 -perhance intro image seed : (seed:::968873840)
 
 
+-Her 7. vurus 100% kritik vurur buff
+-

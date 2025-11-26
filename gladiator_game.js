@@ -4,8 +4,11 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const AVATARS = ['🗿', '🦁', '💀', '👺'];
 
+// How many fights (win or loss) before shops fully refresh
+const SHOP_REFRESH_INTERVAL = 10;
+
 // In-game portrait images for combat
-const PLAYER_AVATAR_IMG = 'assets/images/ingame-avatars/player.jpeg';
+const PLAYER_AVATAR_IMG = 'assets/images/ingame-avatars/player.png';
 const ENEMY_AVATARS = {
     bandit:   'assets/images/ingame-avatars/bandit1.jpeg',
     goblin:   'assets/images/ingame-avatars/goblin1.jpeg',
@@ -267,8 +270,12 @@ class Player {
 }
 
 const game = {
-    player: null, selectedAvatar: 0, shopStock: { weapon: [], armor: [] }, lastShopReset: 0, shopSortOrder: 'desc', shopSortKey: 'price', currentShopType: 'weapon',
+    player: null, selectedAvatar: 0, shopStock: { weapon: [], armor: [], trinket: [] }, shopSortOrder: 'desc', shopSortKey: 'price', currentShopType: 'weapon',
     saveSlots: [], lastSlot: -1, currentSlotIndex: -1,
+    // total fights played (win or loss)
+    shopFightCount: 0,
+    // fight counter value when shop was last regenerated
+    lastShopFightReset: 0,
 
     selectAvatar(idx) { this.selectedAvatar = idx; document.querySelectorAll('.avatar-option').forEach((el, i) => el.classList.toggle('selected', i === idx)); },
     // --- SAVE SYSTEM HELPERS (MULTI-SLOT, MAX 5) ---
@@ -366,7 +373,18 @@ const game = {
         this.sortShop(this.shopStock.weapon);
         this.sortShop(this.shopStock.armor);
         this.sortShop(this.shopStock.trinket);
-        this.lastShopReset = this.player.wins;
+        // mark current fight counter as last refresh point
+        this.lastShopFightReset = this.shopFightCount;
+        this.updateShopRefreshIndicator();
+    },
+    updateShopRefreshIndicator() {
+        const el = $('shop-refresh-indicator');
+        if (!el) return;
+        const fightsSince = this.shopFightCount - this.lastShopFightReset;
+        let remaining = SHOP_REFRESH_INTERVAL - fightsSince;
+        if (remaining < 0) remaining = 0;
+        const label = remaining === 1 ? 'fight' : 'fights';
+        el.innerHTML = `Shop refreshes in <span class="shop-refresh-count">${remaining}</span> ${label}`;
     },
     addTestGold(amount = 100) {
         if(!this.player) return;
@@ -453,147 +471,17 @@ const game = {
         }
     },
     showHub() {
-        document.querySelectorAll('.menu-screen, .hidden').forEach(e => { if(!e.classList.contains('modal-overlay')) e.classList.add('hidden'); });
-        $('screen-combat').classList.add('hidden'); $('screen-hub').classList.remove('hidden'); this.updateHubUI();
-        if (typeof stopFightMusic === 'function') stopFightMusic();
-        wireButtonSfx($('screen-hub'));
-    },
-    openStatsHelp() {
-        const m = $('modal-stats');
-        if(m) m.classList.remove('hidden');
-    },
-    closeStatsHelp() {
-        const m = $('modal-stats');
-        if(m) m.classList.add('hidden');
-    },
-    openArmorPanel() {
-        const p = this.player;
-        const list = $('armor-list');
-        const summary = $('armor-summary');
-        const totalEl = $('armor-total');
-        if(!p || !list || !summary || !totalEl) return;
-        list.innerHTML = '';
-        const totalArmor = p.getTotalArmor();
-        const equippedCount = ARMOR_SLOTS.filter(s => p.gear[s]).length;
-        summary.innerText = `Equipped armor pieces: ${equippedCount}/${ARMOR_SLOTS.length}`;
-        const previewBox = $('shop-preview');
-        const previewBody = $('shop-preview-body');
-        const previewIcon = $('shop-preview-icon');
-        const buildPreview = (item, slot) => {
-            if (!item || !previewBody) return;
-            const rarityText = (item.rarity || '').replace('rarity-','');
-            let lines = [];
-            lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
-            const val = (typeof item.val === 'number') ? ` (+${item.val})` : '';
-            lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
-            if (slot) lines.push(`<div><span class="text-blue">Slot:</span> ${slot}</div>`);
-
-            // StatMods (örneğin +2 Defence) göster
-            if (item.statMods) {
-                const map = [
-                    { key: 'str', label: 'Strength', cls: 'text-orange' },
-                    { key: 'atk', label: 'Attack',   cls: 'text-red' },
-                    { key: 'def', label: 'Defence',  cls: 'text-blue' },
-                    { key: 'vit', label: 'Vitality', cls: 'text-green' },
-                    { key: 'mag', label: 'Magicka',  cls: 'text-purple' },
-                    { key: 'chr', label: 'Charisma', cls: 'text-gold' }
-                ];
-                map.forEach(({key,label,cls}) => {
-                    const v = item.statMods[key];
-                    if (typeof v === 'number' && v !== 0) {
-                        const sign = v > 0 ? '+' : '';
-                        lines.push(`<div class="${cls}">${sign}${v} ${label}</div>`);
-                    }
-                });
-            }
-
-            // Lore / info satırı
-            if (item.info) {
-                const infoClass = item.infoColor || 'text-gold';
-                lines.push(`<div style="margin-top:4px; font-size:0.8rem; font-style:italic;" class="${infoClass}">${item.info}</div>`);
-            }
-
-            lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa;">Rarity: ${rarityText}</div>`);
-            previewBody.innerHTML = lines.join('');
-
-            // Update armor icon in tooltip for armor panel
-            if (previewIcon) {
-                const iconPath = getArmorIconPath(item);
-                if (iconPath) {
-                    previewIcon.src = iconPath;
-                    previewIcon.classList.remove('hidden');
-                } else {
-                    previewIcon.src = '';
-                    previewIcon.classList.add('hidden');
-                }
-            }
-        };
-        const movePreview = (ev) => {
-            if (!previewBox) return;
-            const rect = $('game-container').getBoundingClientRect();
-            const offsetX = 28, offsetY = 25;
-            let x = ev.clientX - rect.left + offsetX;
-            let y = ev.clientY - rect.top + offsetY;
-            const maxX = rect.width - 340;
-            const maxY = rect.height - 160;
-            x = Math.max(10, Math.min(maxX, x));
-            y = Math.max(10, Math.min(maxY, y));
-            previewBox.style.left = x + 'px';
-            previewBox.style.top = y + 'px';
-        };
-        ARMOR_SLOTS.forEach(slot => {
-            const item = p.gear[slot];
-            const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.justifyContent = 'space-between';
-            row.style.marginBottom = '6px';
-            const title = slot.charAt(0).toUpperCase()+slot.slice(1);
-            let rightHtml;
-            if(item) {
-                const val = (typeof item.val === 'number') ? ` (+${item.val})` : '';
-                rightHtml = `<span class="${item.rarity}">${item.name}</span><span style="color:#888; font-size:0.8rem;">${val}</span>`;
-            } else {
-                rightHtml = `<span style="color:#444;">-</span>`;
-            }
-            row.innerHTML = `<span>${title}</span><span>${rightHtml}</span>`;
-            if (item && previewBox && previewBody) {
-                row.onmouseenter = (ev) => {
-                    buildPreview(item, slot);
-                    movePreview(ev);
-                    previewBox.classList.remove('hidden');
-                    previewBox.classList.add('visible');
-                };
-                row.onmousemove = (ev) => {
-                    if (previewBox.classList.contains('visible')) movePreview(ev);
-                };
-                row.onmouseleave = () => {
-                    previewBox.classList.remove('visible');
-                };
-            }
-            list.appendChild(row);
-        });
-        totalEl.innerText = totalArmor;
-        $('modal-armor').classList.remove('hidden');
-    },
-    closeArmorPanel() { $('modal-armor').classList.add('hidden'); },
-    goToMainMenu() {
-        // Hide all main screens
-        document.querySelectorAll('.menu-screen').forEach(e => e.classList.add('hidden'));
-        // Hide combat screen explicitly
+        // Hide all menu screens except hub, stop combat music, refresh hub UI
+        // (non-modal overlays stay controlled by their own logic)
+        const screens = document.querySelectorAll('.menu-screen');
+        screens.forEach(e => e.classList.add('hidden'));
         const combatScreen = $('screen-combat');
         if (combatScreen) combatScreen.classList.add('hidden');
-        // Hide all modals
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden'));
-        // Show start screen
-        const start = $('screen-start');
-        if (start) start.classList.remove('hidden');
-    },
-    async initIntro() {
-        this.initSaves();
-        // Wire SFX for main menu buttons on initial load
-        if (typeof wireButtonSfx === 'function') {
-            wireButtonSfx(document.getElementById('screen-start') || document);
-        }
+        const hubScreen = $('screen-hub');
+        if (hubScreen) hubScreen.classList.remove('hidden');
+        this.updateHubUI();
+        if (typeof stopFightMusic === 'function') stopFightMusic();
+        wireButtonSfx($('screen-hub'));
     },
     async playIntroSequence(forNewGame = false) {
         const introScreen = $('screen-intro');
@@ -773,19 +661,12 @@ const game = {
             if(item) {
                 if(item.type === 'weapon') {
                     const dmgText = (typeof item.min === 'number' && typeof item.max === 'number') ? ` <span style="color:#888; font-size:0.8rem;">(${item.min}-${item.max})</span>` : '';
-                    const baseLower = (item.baseType || '').toLowerCase();
                     const isLegendary = item.rarityKey === 'legendary';
                     const baseName = isLegendary ? cleanLegendaryWeaponName(item) : item.name;
-                    let tags = '';
-                    if(isLegendary) {
-                        const parts = [];
-                        if(baseLower) parts.push(`[${baseLower}]`);
-                        if (parts.length) tags = ` <span style="color:#888; font-size:0.75rem;">${parts.join(' ')}</span>`;
-                    }
                     // Hub'daki Melee Weapon satırı için isim span'ine id ver (tooltip hedefi)
                     const spanId = (slot === 'weapon') ? 'hub-weapon-name' : '';
                     const idAttr = spanId ? ` id="${spanId}"` : '';
-                    display = `<span${idAttr} class="${item.rarity}">${baseName}${tags}</span>${dmgText}`;
+                    display = `<span${idAttr} class="${item.rarity}">${baseName}</span>${dmgText}`;
                 } else if (item.type === 'trinket') {
                     const spanId = (slot === 'trinket1') ? 'hub-trinket1-name' : (slot === 'trinket2') ? 'hub-trinket2-name' : '';
                     const idAttr = spanId ? ` id="${spanId}"` : '';
@@ -926,10 +807,15 @@ const game = {
         wireWeaponHover();
         setupTrinketHover('hub-trinket1-name', p.gear.trinket1);
         setupTrinketHover('hub-trinket2-name', p.gear.trinket2);
+        // Hub'a döndüğümüzde de shop sayaç bilgisini tazele
+        this.updateShopRefreshIndicator();
     },
     doUnequip(slot) { this.player.unequip(slot); this.updateHubUI(); this.saveGame(); },
     openShop(type) {
-        if(this.player.wins - this.lastShopReset >= 4) this.generateShopStock();
+        // Refresh all shop stock only if at least SHOP_REFRESH_INTERVAL fights have passed since last reset
+        if ((this.shopFightCount - this.lastShopFightReset) >= SHOP_REFRESH_INTERVAL) {
+            this.generateShopStock();
+        }
         // remember which category is currently open so sorting works on the right list
         this.currentShopType = type;
         let list;
@@ -1006,8 +892,9 @@ const game = {
         const getItemTypeLabel = (item) => {
             if (!item) return '';
             if (item.type === 'weapon') {
-                if (item.weaponClass) return item.weaponClass;
+                // Always show a textual weapon type for the TYPE column
                 if (item.baseType) return item.baseType;
+                if (item.weaponClass) return item.weaponClass;
                 return 'Weapon';
             }
             if (item.type === 'armor') {
@@ -1160,20 +1047,16 @@ const game = {
                     if(baseLower) parts.push(`[${baseLower}]`);
                     if (parts.length) nameSuffix = ` <span style="color:#666; font-size:0.75rem;">${parts.join(' ')}</span>`;
                 }
-                let statDisplay;
-                if (isWeapon) {
-                    statDisplay = `Dmg: ${equipped.min}-${equipped.max}`;
-                } else if (equipped.type === 'armor') {
-                    statDisplay = `Armor: ${equipped.val}`;
-                } else if (equipped.type === 'trinket') {
-                    statDisplay = 'Trinket';
-                } else {
-                    statDisplay = '';
-                }
-                const slotTag = !isWeapon ? ` <span style="color:#666; font-size:0.7rem">[${slot}]</span>` : '';
+                const typeLabel = getItemTypeLabel(equipped);
                 const row = document.createElement('div');
                 row.className = 'item-row';
-                row.innerHTML = `<div class="${equipped.rarity}">${baseName}${nameSuffix}${slotTag}</div><div style="font-size:0.8rem;">${equipped.rarity.replace('rarity-','')}</div><div style="font-size:0.8rem; color:#ccc;">${statDisplay}</div><div class="text-gold">-</div><button class="btn" style="padding:5px 10px; font-size:0.8rem;">Unequip</button>`;
+                row.innerHTML = `
+                    <div class="${equipped.rarity}">${baseName}${nameSuffix}</div>
+                    <div style="font-size:0.8rem;">${equipped.rarity.replace('rarity-','')}</div>
+                    <div style="font-size:0.8rem; color:#ccc;">${typeLabel}</div>
+                    <div style="font-size:0.8rem; color:#ccc;">-</div>
+                    <div class="text-gold">-</div>
+                    <button class="btn" style="padding:5px 10px; font-size:0.8rem;">Unequip</button>`;
                 row.querySelector('button').onclick = () => {
                     this.doUnequip(slot);
                     this.renderList(this.player.inventory, mode);
@@ -1232,26 +1115,15 @@ const game = {
 
             const cls = item.type === 'weapon' ? (item.weaponClass || '').toLowerCase() : '';
             const baseLower = item.type === 'weapon' ? (item.baseType || '').toLowerCase() : '';
-            const slotTag = item.type === 'armor' ? ` <span style="color:#666; font-size:0.7rem">[${item.slot}]</span>` : '';
             const isLegendaryWeapon = item.type === 'weapon' && item.rarityKey === 'legendary';
-            const showTags = (mode !== 'shop');
             const minLvl = getItemMinLevel(item);
             const lvlOk = !this.player || (this.player.level >= minLvl);
             let nameHtml;
             if(isLegendaryWeapon) {
                 const baseName = cleanLegendaryWeaponName(item);
-                const parts = [];
-                if(baseLower) parts.push(`[${baseLower}]`);
-                const tags = (showTags && parts.length)
-                    ? ` <span style="color:#666; font-size:0.7rem">${parts.join(' ')}</span>`
-                    : '';
-                nameHtml = `${baseName}${tags}`;
+                nameHtml = `${baseName}`;
             } else {
-                const classTag = (item.type === 'weapon' && cls && showTags)
-                    ? ` <span style="color:#666; font-size:0.7rem">[${cls}]</span>`
-                    : '';
-                const slotPart = (item.type === 'armor' && showTags) ? slotTag : '';
-                nameHtml = `${item.name}${slotPart}${classTag}`;
+                nameHtml = `${item.name}`;
             }
             const btnTxt = mode === 'shop' ? `Buy` : 'Equip';
             const priceTxt = mode === 'shop' ? `${item.price}` : '-';
@@ -1332,7 +1204,13 @@ const game = {
             if (meta.slots.length >= 5) return; // cannot save more
             this.currentSlotIndex = meta.slots.length;
         }
-        meta.slots[this.currentSlotIndex] = this.player;
+        const slotData = {
+            ...this.player,
+            _shopStock: this.shopStock,
+            _shopFightCount: this.shopFightCount,
+            _lastShopFightReset: this.lastShopFightReset,
+        };
+        meta.slots[this.currentSlotIndex] = slotData;
         meta.lastSlot = this.currentSlotIndex;
         this.saveSlots = meta.slots;
         this.lastSlot = meta.lastSlot;
@@ -1374,6 +1252,22 @@ const game = {
         // Inventory
         if(Array.isArray(this.player.inventory)) {
             this.player.inventory.forEach(it => fixLegendaryItemName(it));
+        }
+
+        // Shop state'ini kayıttan geri yükle (yoksa defaultla)
+        if (plain._shopStock) {
+            this.shopStock = plain._shopStock;
+        } else {
+            this.shopStock = { weapon: [], armor: [], trinket: [] };
+        }
+        this.shopFightCount = typeof plain._shopFightCount === 'number' ? plain._shopFightCount : 0;
+        this.lastShopFightReset = typeof plain._lastShopFightReset === 'number' ? plain._lastShopFightReset : 0;
+        // Eğer herhangi bir sebeple shop listeleri boşsa, bir kez generate et
+        const hasAnyShop = (this.shopStock.weapon && this.shopStock.weapon.length) ||
+            (this.shopStock.armor && this.shopStock.armor.length) ||
+            (this.shopStock.trinket && this.shopStock.trinket.length);
+        if (!hasAnyShop) {
+            this.generateShopStock();
         }
 
         this.currentSlotIndex = index;
@@ -1504,7 +1398,7 @@ const game = {
         this.player.stats = { ...this.tempCreateStats };
         this.player.pts = 0;
         this.generateShopStock();
-        this.showHub();
+        game.showHub();
         this.saveGame();
     },
     closeVictory() { $('modal-victory').classList.add('hidden'); $('vic-xp-bar').style.width='0%'; if(this.player.xp >= this.player.xpMax) { this.player.xp -= this.player.xpMax; this.player.xpMax=Math.floor(this.player.xpMax*1.5); this.player.level++; this.triggerLevelUp(); } else { this.showHub(); } }
@@ -2284,6 +2178,9 @@ const combat = {
         $('vic-xp-gain').innerText = xp;
         $('vic-xp-text').innerText = `${p.xp}/${p.xpMax}`;
         setTimeout(()=>{ const pct=Math.min(100,(p.xp/p.xpMax)*100); $('vic-xp-bar').style.width=pct+'%'; },100);
+        // Every victory counts as a fight for shop refresh logic
+        game.shopFightCount = (game.shopFightCount || 0) + 1;
+        game.updateShopRefreshIndicator();
         game.saveGame();
     },
     animateVal(id,s,e,d){ let obj=$(id),r=e-s,st=new Date().getTime(),et=st+d; let t=setInterval(()=>{ let n=new Date().getTime(),rem=Math.max((et-n)/d,0),v=Math.round(e-(rem*r)); obj.innerHTML=v; if(v==e)clearInterval(t); },20); },
@@ -2332,6 +2229,9 @@ game.handlePlayerDeath = function() {
     if (remEl) remEl.innerText = this.player.gold;
     const m = $('modal-death');
     if (m) m.classList.remove('hidden');
+    // Death also counts as a fight for shop refresh logic
+    this.shopFightCount = (this.shopFightCount || 0) + 1;
+    this.updateShopRefreshIndicator();
     this.saveGame();
 };
 

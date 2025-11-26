@@ -107,6 +107,17 @@ body {
 .text-shield { color: var(--shield-color); }
 .glow-purple { color: var(--accent-purple); text-shadow: 0 0 10px var(--accent-purple); }
 
+/* Shop refresh indicator: base text neutral, number glows blue */
+.shop-refresh-indicator {
+    font-size: 0.78rem;
+    color: #e0e0e0;
+    letter-spacing: 0.05em;
+}
+.shop-refresh-indicator .shop-refresh-count {
+    color: var(--accent-blue);
+    text-shadow: 0 0 8px rgba(41, 121, 255, 0.9);
+}
+
 /* --- INPUTS (FIXED) --- */
 input, select {
     background: #222 !important; border: 2px solid #444 !important; color: #fff !important;
@@ -179,10 +190,27 @@ input:focus, select:focus { border-color: var(--accent-green) !important; }
     height:150%;
     object-fit:cover;
 }
+/* DOT icon stack next to player avatar */
+#status-row.dot-stack {
+    position:absolute;
+    bottom:290px; /* roughly align with avatar's vertical position */
+    left:200px;   /* to the right of the avatar */
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:4px;
+}
+
+/* Force DOT badges to stack vertically instead of inline row */
+#status-row.dot-stack #status-icons {
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
 /* Player portrait: above player HP/armor bars on the left */
 .combat-avatar-player {
     left:50px;
-    bottom:310px;
+    bottom:290px;
 }
 /* Enemy portrait: below enemy HP/armor bars on the right */
 .combat-avatar-enemy {
