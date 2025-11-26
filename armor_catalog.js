@@ -1,4 +1,4 @@
-const ARMORS = [
+const MANUAL_ARMORS = [
   // --- COMMON ARMOR ---
   {
     key: 'leather_helm',
@@ -14,748 +14,204 @@ const ARMORS = [
     price: 25,
     minShopLevel: 1,
     statMods: {}
-  },
-  {
-    key: 'leather_boots',
-    name: 'Leather Boots',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 3,
-    stat: 'Armor',
-    price: 20,
-    minShopLevel: 1,
-    statMods: { chr: 1 }
-  },
-  {
-    key: 'padded_vest',
-    name: 'Padded Vest',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'chest',
-    baseType: 'Chestplate',
-    val: 4,
-    stat: 'Armor',
-    price: 30,
-    minShopLevel: 1,
-    statMods: {}
-  },
-  {
-    key: 'cloth_hood',
-    name: 'Cloth Hood',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'head',
-    baseType: 'Hood',
-    val: 2,
-    stat: 'Armor',
-    price: 15,
-    minShopLevel: 1,
-    statMods: { mag: 1 }
-  },
-  {
-    key: 'travelers_cloak',
-    name: "Traveler's Cloak",
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'shoulders',
-    baseType: 'Cloak',
-    val: 3,
-    stat: 'Armor',
-    price: 22,
-    minShopLevel: 1,
-    statMods: { chr: 1 }
-  },
-  {
-    key: 'worn_bracers',
-    name: 'Worn Bracers',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'arms',
-    baseType: 'Bracers',
-    val: 3,
-    stat: 'Armor',
-    price: 20,
-    minShopLevel: 1,
-    statMods: { atk: 1 }
-  },
-  {
-    key: 'stitched_greaves',
-    name: 'Stitched Greaves',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 4,
-    stat: 'Armor',
-    price: 28,
-    minShopLevel: 1,
-    statMods: {}
-  },
-  {
-    key: 'buckler_shield',
-    name: 'Buckler Shield',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 4,
-    stat: 'Armor',
-    price: 30,
-    minShopLevel: 1,
-    statMods: { def: 1 }
-  },
-  {
-    key: 'quilted_pants',
-    name: 'Quilted Pants',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'shins',
-    baseType: 'Leggings',
-    val: 3,
-    stat: 'Armor',
-    price: 23,
-    minShopLevel: 1,
-    statMods: { vit: 1 }
-  },
-  {
-    key: 'guards_tunic',
-    name: "Guard's Tunic",
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'common',
-    rarity: 'rarity-common',
-    slot: 'chest',
-    baseType: 'Chestplate',
-    val: 4,
-    stat: 'Armor',
-    price: 32,
-    minShopLevel: 1,
-    statMods: { def: 1 }
-  },
-
-  // --- UNCOMMON ARMOR ---
-  {
-    key: 'iron_chest',
-    name: 'Iron Chestplate',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'chest',
-    baseType: 'Chestplate',
-    val: 7,
-    stat: 'Armor',
-    price: 70,
-    minShopLevel: 2,
-    statMods: { vit: 1 }
-  },
-  {
-    key: 'iron_gauntlets',
-    name: 'Iron Gauntlets',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'arms',
-    baseType: 'Gauntlets',
-    val: 5,
-    stat: 'Armor',
-    price: 55,
-    minShopLevel: 2,
-    statMods: { atk: 1 }
-  },
-  {
-    key: 'iron_greaves',
-    name: 'Iron Greaves',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 6,
-    stat: 'Armor',
-    price: 60,
-    minShopLevel: 2,
-    statMods: { def: 1 }
-  },
-  {
-    key: 'chain_hood',
-    name: 'Chain Hood',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'head',
-    baseType: 'Coif',
-    val: 6,
-    stat: 'Armor',
-    price: 70,
-    minShopLevel: 2,
-    statMods: { def: 1 }
-  },
-  {
-    key: 'chain_boots',
-    name: 'Chain Boots',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'shins',
-    baseType: 'Sabatons',
-    val: 6,
-    stat: 'Armor',
-    price: 72,
-    minShopLevel: 2,
-    statMods: { vit: 1 }
-  },
-  {
-    key: 'reinforced_bracers',
-    name: 'Reinforced Bracers',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'arms',
-    baseType: 'Bracers',
-    val: 5,
-    stat: 'Armor',
-    price: 65,
-    minShopLevel: 2,
-    statMods: { atk: 1, def: 1 }
-  },
-  {
-    key: 'scout_mantle',
-    name: 'Scout Mantle',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'shoulders',
-    baseType: 'Mantle',
-    val: 5,
-    stat: 'Armor',
-    price: 60,
-    minShopLevel: 2,
-    statMods: { chr: 1, atk: 1 }
-  },
-  {
-    key: 'kite_shield',
-    name: 'Kite Shield',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 8,
-    stat: 'Armor',
-    price: 80,
-    minShopLevel:1,
-    statMods: { def: 2 },
-  },
-  {
-    key: 'brigand_vest',
-    name: 'Brigand Vest',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'chest',
-    baseType: 'Vest',
-    val: 6,
-    stat: 'Armor',
-    price: 68,
-    minShopLevel: 2,
-    statMods: { atk: 1, chr: 1 }
-  },
-  {
-    key: 'sentry_mask',
-    name: 'Sentry Mask',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'uncommon',
-    rarity: 'rarity-uncommon',
-    slot: 'head',
-    baseType: 'Mask',
-    val: 5,
-    stat: 'Armor',
-    price: 62,
-    minShopLevel: 2,
-    statMods: { chr: 1, def: 1 }
-  },
-
-  // --- RARE ARMOR ---
-  {
-    key: 'guardian_shield',
-    name: 'Guardian Shield',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 10,
-    stat: 'Armor',
-    price: 120,
-    minShopLevel: 3,
-    statMods: { def: 2 }
-  },
-  {
-    key: 'battle_mantle',
-    name: 'Battle Mantle',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'shoulders',
-    baseType: 'Pauldrons',
-    val: 8,
-    stat: 'Armor',
-    price: 110,
-    minShopLevel: 3,
-    statMods: { str: 2 }
-  },
-  {
-    key: 'mage_robe',
-    name: "Mage's Robe",
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'chest',
-    baseType: 'Robe',
-    val: 6,
-    stat: 'Armor',
-    price: 115,
-    minShopLevel: 3,
-    statMods: { mag: 3 }
-  },
-  {
-    key: 'lion_helm',
-    name: 'Lion Helm',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'head',
-    baseType: 'Helm',
-    val: 9,
-    stat: 'Armor',
-    price: 130,
-    minShopLevel: 3,
-    statMods: { str: 2, vit: 1 }
-  },
-  {
-    key: 'warlord_cuirass',
-    name: 'Warlord Cuirass',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'chest',
-    baseType: 'Cuirass',
-    val: 11,
-    stat: 'Armor',
-    price: 145,
-    minShopLevel: 3,
-    statMods: { vit: 2, def: 1 }
-  },
-  {
-    key: 'spellbinder_gloves',
-    name: 'Spellbinder Gloves',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'arms',
-    baseType: 'Gloves',
-    val: 7,
-    stat: 'Armor',
-    price: 125,
-    minShopLevel: 3,
-    statMods: { mag: 3 }
-  },
-  {
-    key: 'shadowstep_boots',
-    name: 'Shadowstep Boots',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'shins',
-    baseType: 'Boots',
-    val: 8,
-    stat: 'Armor',
-    price: 130,
-    minShopLevel: 3,
-    statMods: { atk: 1, chr: 2 }
-  },
-  {
-    key: 'siege_greaves',
-    name: 'Siege Greaves',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 9,
-    stat: 'Armor',
-    price: 135,
-    minShopLevel: 3,
-    statMods: { def: 2, vit: 1 }
-  },
-  {
-    key: 'radiant_cape',
-    name: 'Radiant Cape',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'shoulders',
-    baseType: 'Cape',
-    val: 8,
-    stat: 'Armor',
-    price: 128,
-    minShopLevel: 3,
-    statMods: { chr: 2, mag: 1 }
-  },
-  {
-    key: 'mirror_shield',
-    name: 'Mirror Shield',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'rare',
-    rarity: 'rarity-rare',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 11,
-    stat: 'Armor',
-    price: 150,
-    minShopLevel: 3,
-    statMods: { def: 3 }
-  },
-
-  // --- EPIC ARMOR ---
-  {
-    key: 'oathbound_helm',
-    name: 'Oathbound Helm',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'head',
-    baseType: 'Helm',
-    val: 11,
-    stat: 'Armor',
-    price: 200,
-    minShopLevel: 4,
-    statMods: { vit: 2, def: 1 }
-  },
-  {
-    key: 'stormplate',
-    name: 'Stormplate Armor',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'chest',
-    baseType: 'Breastplate',
-    val: 14,
-    stat: 'Armor',
-    price: 230,
-    minShopLevel: 4,
-    statMods: { vit: 2, str: 1 }
-  },
-  {
-    key: 'veilwalkers_boots',
-    name: "Veilwalker's Boots",
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 10,
-    stat: 'Armor',
-    price: 210,
-    minShopLevel: 4,
-    statMods: { chr: 2, atk: 1 }
-  },
-  {
-    key: 'dreadlords_visor',
-    name: "Dreadlord's Visor",
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'head',
-    baseType: 'Helm',
-    val: 13,
-    stat: 'Armor',
-    price: 230,
-    minShopLevel: 4,
-    statMods: { def: 2, chr: 1 }
-  },
-  {
-    key: 'heartforge_mail',
-    name: 'Heartforge Mail',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'chest',
-    baseType: 'Mail',
-    val: 15,
-    stat: 'Armor',
-    price: 250,
-    minShopLevel: 4,
-    statMods: { vit: 3, def: 1 }
-  },
-  {
-    key: 'thunderbound_gauntlets',
-    name: 'Thunderbound Gauntlets',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'arms',
-    baseType: 'Gauntlets',
-    val: 12,
-    stat: 'Armor',
-    price: 225,
-    minShopLevel: 4,
-    statMods: { str: 2, atk: 2 }
-  },
-  {
-    key: 'skystride_greaves',
-    name: 'Skystride Greaves',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 13,
-    stat: 'Armor',
-    price: 235,
-    minShopLevel: 4,
-    statMods: { vit: 2, atk: 1 }
-  },
-  {
-    key: 'phoenix_cloak',
-    name: 'Phoenix Cloak',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'shoulders',
-    baseType: 'Cloak',
-    val: 12,
-    stat: 'Armor',
-    price: 220,
-    minShopLevel: 4,
-    statMods: { mag: 2, chr: 2 }
-  },
-  {
-    key: 'spellweave_robes',
-    name: 'Spellweave Robes',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'chest',
-    baseType: 'Robe',
-    val: 11,
-    stat: 'Armor',
-    price: 225,
-    minShopLevel: 4,
-    statMods: { mag: 4 }
-  },
-  {
-    key: 'bulwark_of_twilight',
-    name: 'Bulwark of Twilight',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'epic',
-    rarity: 'rarity-epic',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 15,
-    stat: 'Armor',
-    price: 255,
-    minShopLevel: 4,
-    statMods: { def: 3, vit: 2 }
-  },
-
-  // --- LEGENDARY ARMOR ---
-  {
-    key: 'dragon_greaves',
-    name: 'Dragon Greaves',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'shins',
-    baseType: 'Greaves',
-    val: 15,
-    stat: 'Armor',
-    price: 350,
-    minShopLevel: 5,
-    statMods: { vit: 2 }
-  },
-  {
-    key: 'aegis_of_kings',
-    name: 'Aegis of Kings',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 18,
-    stat: 'Armor',
-    price: 420,
-    minShopLevel: 6,
-    statMods: { def: 4, vit: 2 }
-  },
-  {
-    key: 'crown_of_the_void',
-    name: 'Crown of the Void',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'head',
-    baseType: 'Crown',
-    val: 12,
-    stat: 'Armor',
-    price: 380,
-    minShopLevel: 6,
-    statMods: { mag: 4, chr: 3 }
-  },
-  {
-    key: 'starlight_ward',
-    name: 'Starlight Ward',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'shoulders',
-    baseType: 'Mantle',
-    val: 14,
-    stat: 'Armor',
-    price: 360,
-    minShopLevel: 5,
-    statMods: { mag: 3, chr: 3 }
-  },
-  {
-    key: 'tyrants_carapace',
-    name: "Tyrant's Carapace",
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'chest',
-    baseType: 'Plate',
-    val: 18,
-    stat: 'Armor',
-    price: 410,
-    minShopLevel: 6,
-    statMods: { vit: 3, def: 3 }
-  },
-  {
-    key: 'mask_of_the_depths',
-    name: 'Mask of the Depths',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'head',
-    baseType: 'Mask',
-    val: 15,
-    stat: 'Armor',
-    price: 380,
-    minShopLevel: 6,
-    statMods: { mag: 4, def: 2 }
-  },
-  {
-    key: 'celestial_sabatons',
-    name: 'Celestial Sabatons',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'shins',
-    baseType: 'Sabatons',
-    val: 16,
-    stat: 'Armor',
-    price: 390,
-    minShopLevel: 5,
-    statMods: { vit: 3, chr: 2 }
-  },
-  {
-    key: 'mantle_of_eternity',
-    name: 'Mantle of Eternity',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'shoulders',
-    baseType: 'Cape',
-    val: 15,
-    stat: 'Armor',
-    price: 385,
-    minShopLevel: 6,
-    statMods: { mag: 3, vit: 2 }
-  },
-  {
-    key: 'gauntlets_of_rage',
-    name: 'Gauntlets of Rage',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'arms',
-    baseType: 'Gauntlets',
-    val: 14,
-    stat: 'Armor',
-    price: 370,
-    minShopLevel: 5,
-    statMods: { str: 4, atk: 3 }
-  },
-  {
-    key: 'dragonheart_aegis',
-    name: 'Dragonheart Aegis',
-    type: 'armor',
-    category: 'armor',
-    rarityKey: 'legendary',
-    rarity: 'rarity-legendary',
-    slot: 'shield',
-    baseType: 'Shield',
-    val: 20,
-    stat: 'Armor',
-    price: 430,
-    minShopLevel: 6,
-    statMods: { def: 5, vit: 3 }
   }
 ];
+
+const ARMOR_RARITY_CONFIG = {
+  common: {
+    key: 'common',
+    css: 'rarity-common',
+    armorMult: 1.0,
+    statBudget: 0
+  },
+  uncommon: {
+    key: 'uncommon',
+    css: 'rarity-uncommon',
+    armorMult: 1.1,
+    statBudget: 2
+  },
+  rare: {
+    key: 'rare',
+    css: 'rarity-rare',
+    armorMult: 1.25,
+    statBudget: 4
+  },
+  epic: {
+    key: 'epic',
+    css: 'rarity-epic',
+    armorMult: 1.4,
+    statBudget: 6
+  },
+  legendary: {
+    key: 'legendary',
+    css: 'rarity-legendary',
+    armorMult: 1.6,
+    statBudget: 8
+  }
+};
+
+const ARMOR_STAT_KEYS = ['str', 'vit', 'atk', 'def', 'chr', 'mag'];
+
+const ARMOR_CLASS_WEIGHT_TABLE = {
+  Heavy: ['vit', 'vit', 'def', 'def', 'str', 'str'],
+  Medium: ['def', 'def', 'vit', 'atk', 'str', 'chr'],
+  Light: ['chr', 'chr', 'atk', 'atk', 'vit', 'mag'],
+  Mystic: ['mag', 'mag', 'mag', 'vit', 'def', 'chr'],
+  Shield: ['def', 'def', 'def', 'vit', 'str']
+};
+
+const ARMOR_STAT_SUFFIX = {
+  str: 'of Titanbound Might',
+  vit: 'of Iron Resolve',
+  atk: 'of Bladed Fury',
+  def: 'of the Stonewall',
+  chr: 'of Regal Supremacy',
+  mag: 'of Eldritch Wards'
+};
+
+const ARMOR_LEGENDARY_UNIQUE_NAMES = [
+  'Bulwark of the Fallen Sun',
+  'Aegis of Eternal Night',
+  'Lionheart Plate',
+  'Warden of the Last Dawn',
+  'Grimhold Carapace',
+  'Shroud of the Unforgiven',
+  'Cinderplate of Kings',
+  'Phantombound Harness',
+  'Starbreaker Battlegear',
+  'Helm of the Red Monarch'
+];
+
+
+const ARMOR_BASE_TYPES = [
+  { key: 'cloth_hood', slot: 'head', baseType: 'Hood', armorClass: 'Light', baseVal: 2, scale: 0.9 },
+  { key: 'leather_cap', slot: 'head', baseType: 'Cap', armorClass: 'Medium', baseVal: 3, scale: 1.0 },
+  { key: 'iron_helm', slot: 'head', baseType: 'Helm', armorClass: 'Heavy', baseVal: 4, scale: 1.2 },
+
+  { key: 'padded_vest', slot: 'chest', baseType: 'Vest', armorClass: 'Light', baseVal: 3, scale: 1.2 },
+  { key: 'leather_armor', slot: 'chest', baseType: 'Leather Armor', armorClass: 'Medium', baseVal: 4, scale: 1.4 },
+  { key: 'plate_cuirass', slot: 'chest', baseType: 'Cuirass', armorClass: 'Heavy', baseVal: 6, scale: 1.6 },
+
+  { key: 'cloth_wrappings', slot: 'arms', baseType: 'Wrappings', armorClass: 'Light', baseVal: 2, scale: 0.9 },
+  { key: 'leather_bracers', slot: 'arms', baseType: 'Bracers', armorClass: 'Medium', baseVal: 3, scale: 1.1 },
+  { key: 'iron_gauntlets', slot: 'arms', baseType: 'Gauntlets', armorClass: 'Heavy', baseVal: 4, scale: 1.3 },
+
+  { key: 'simple_greaves', slot: 'shins', baseType: 'Greaves', armorClass: 'Medium', baseVal: 3, scale: 1.1 },
+  { key: 'reinforced_greaves', slot: 'shins', baseType: 'Greaves', armorClass: 'Heavy', baseVal: 5, scale: 1.4 },
+
+  { key: 'cloth_mantle', slot: 'shoulders', baseType: 'Mantle', armorClass: 'Light', baseVal: 2, scale: 1.0 },
+  { key: 'metal_pauldron', slot: 'shoulders', baseType: 'Pauldrons', armorClass: 'Medium', baseVal: 3, scale: 1.2 },
+
+  { key: 'buckler', slot: 'shield', baseType: 'Buckler', armorClass: 'Shield', baseVal: 4, scale: 1.3 },
+  { key: 'tower_shield', slot: 'shield', baseType: 'Shield', armorClass: 'Shield', baseVal: 6, scale: 1.6 }
+];
+
+function armorRngInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function armorRngChoice(arr) {
+  return arr[armorRngInt(0, arr.length - 1)];
+}
+
+function armorAllocStats(armorClass, budget) {
+  const mods = { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
+  if (budget <= 0) return mods;
+  const weights = ARMOR_CLASS_WEIGHT_TABLE[armorClass] || ['vit', 'def', 'str', 'atk', 'chr', 'mag'];
+  for (let i = 0; i < budget; i++) {
+    const k = weights[armorRngInt(0, weights.length - 1)];
+    mods[k] = (mods[k] || 0) + 1;
+  }
+  return mods;
+}
+
+function armorDominantStat(statMods) {
+  let bestKey = 'def';
+  let bestVal = -Infinity;
+  for (const key of ARMOR_STAT_KEYS) {
+    const v = statMods[key] || 0;
+    if (v > bestVal) {
+      bestVal = v;
+      bestKey = key;
+    }
+  }
+  return bestKey;
+}
+
+function computeArmorValue(baseVal, itemLevel, scale, rarityMult) {
+  const scaled = (baseVal + itemLevel * scale) * rarityMult;
+  const val = Math.max(1, Math.round(scaled));
+  return { val, avg: val };
+}
+
+function determineArmorMinShopLevel(avg) {
+  if (avg <= 5) return 1;
+  if (avg <= 8) return 2;
+  if (avg <= 11) return 3;
+  if (avg <= 14) return 4;
+  if (avg <= 17) return 5;
+  return 6;
+}
+
+function buildArmorName(baseType, rarityKey, statMods) {
+  const rarity = ARMOR_RARITY_CONFIG[rarityKey];
+  const prefixPool = rarity ? ['Worn', 'Sturdy', 'Reinforced', 'Runed', 'Blessed', 'Ancient'] : [];
+  const prefix = prefixPool.length ? armorRngChoice(prefixPool) : '';
+  const dom = armorDominantStat(statMods);
+  const suffix = ARMOR_STAT_SUFFIX[dom] || 'of Bastion';
+  if (rarityKey === 'legendary') {
+    return armorRngChoice(ARMOR_LEGENDARY_UNIQUE_NAMES);
+  }
+  if (rarityKey === 'common' || rarityKey === 'uncommon') {
+    return `${prefix} ${baseType}`.replace(/\s+/g, ' ').trim();
+  }
+  const useSuffix = armorRngInt(0, 99) < 60;
+  if (!useSuffix) {
+    return `${prefix} ${baseType}`.replace(/\s+/g, ' ').trim();
+  }
+  return `${prefix} ${baseType} ${suffix}`.replace(/\s+/g, ' ').trim();
+}
+
+function priceFromArmor(avg, itemLevel, rarityMult) {
+  const base = avg * avg * 0.7 * rarityMult * (1 + itemLevel * 0.08);
+  return Math.max(1, Math.round(base));
+}
+
+function generateRandomArmors() {
+  const out = [];
+  let idx = 0;
+  for (const base of ARMOR_BASE_TYPES) {
+    for (let itemLevel = 1; itemLevel <= 10; itemLevel++) {
+      for (const rarityKey in ARMOR_RARITY_CONFIG) {
+        const rarity = ARMOR_RARITY_CONFIG[rarityKey];
+        const armor = computeArmorValue(base.baseVal, itemLevel, base.scale, rarity.armorMult);
+        const statMods = armorAllocStats(base.armorClass, rarity.statBudget);
+        const avg = armor.avg;
+        const price = priceFromArmor(avg, itemLevel, rarity.armorMult);
+        const minShopLevel = determineArmorMinShopLevel(avg);
+        const name = buildArmorName(base.baseType, rarityKey, statMods);
+        const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
+
+        out.push({
+          key,
+          name,
+          type: 'armor',
+          category: 'armor',
+          rarityKey,
+          rarity: rarity.css,
+          slot: base.slot,
+          baseType: base.baseType,
+          val: armor.val,
+          stat: 'Armor',
+          price,
+          minShopLevel,
+          statMods
+        });
+      }
+    }
+  }
+  return out;
+}
+
+const GENERATED_ARMORS = generateRandomArmors();
+const ARMORS = [...MANUAL_ARMORS, ...GENERATED_ARMORS];

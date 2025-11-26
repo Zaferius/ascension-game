@@ -90,12 +90,23 @@ const cleanLegendaryWeaponName = (item) => {
 
 class ItemSystem {
     static getRarity() {
-        let r = rng(0, 100);
-        if (r < 40) return { name: 'Common', color: 'rarity-common', mult: 1.0 };
-        if (r < 70) return { name: 'Uncommon', color: 'rarity-uncommon', mult: 1.3 };
-        if (r < 85) return { name: 'Rare', color: 'rarity-rare', mult: 1.6 };
-        if (r < 95) return { name: 'Epic', color: 'rarity-epic', mult: 2.2 };
-        return { name: 'Legendary', color: 'rarity-legendary', mult: 3.5 };
+        // Tiered rarity checks per shop roll:
+        // legendary = 5%, epic = 10%, rare = 15%, uncommon = 40%, common = fallback
+        const common =   { name: 'Common',    color: 'rarity-common',    mult: 1.0 };
+        const uncommon = { name: 'Uncommon',  color: 'rarity-uncommon',  mult: 1.3 };
+        const rare =     { name: 'Rare',      color: 'rarity-rare',      mult: 1.6 };
+        const epic =     { name: 'Epic',      color: 'rarity-epic',      mult: 2.2 };
+        const legendary ={ name: 'Legendary', color: 'rarity-legendary', mult: 3.5 };
+        // 5% legendary
+        if (rng(0, 99) < 5) return legendary;
+        // aksi halde 10% epic
+        if (rng(0, 99) < 10) return epic;
+        // aksi halde 15% rare
+        if (rng(0, 99) < 15) return rare;
+        // aksi halde 40% uncommon
+        if (rng(0, 99) < 40) return uncommon;
+        // kalan durum: common
+        return common;
     }
     static createWeapon(lvl) {
         const rarity = this.getRarity();
@@ -349,8 +360,14 @@ const game = {
         const cls = $('inp-class').value;
         this.player = new Player(name, cls, this.selectedAvatar);
         const rustTemplate = (typeof getWeaponTemplateByKey === 'function')
-            ? getWeaponTemplateByKey('rusty_sword')
-            : (typeof WEAPONS !== 'undefined' ? WEAPONS.find(w => w.key === 'rusty_sword') : null);
+            ? (getWeaponTemplateByKey('rusty_blade') || getWeaponTemplateByKey('rusty_sword'))
+            : (typeof WEAPONS !== 'undefined'
+                ? (
+                    WEAPONS.find(w => w.key === 'rusty_blade')
+                    || WEAPONS.find(w => w.key === 'rusty_sword')
+                    || WEAPONS.find(w => w.type === 'weapon' && w.rarityKey === 'common' && w.weaponClass === 'Sword' && w.minShopLevel === 1)
+                  )
+                : null);
         if (rustTemplate) {
             this.player.equip({ ...rustTemplate, id: Date.now() + Math.random() });
         }
@@ -364,11 +381,50 @@ const game = {
         this.shopStock.armor = [];
         this.shopStock.trinket = [];
         const lvl = this.player.level;
-        for(let i=0; i<8; i++) this.shopStock.weapon.push(ItemSystem.createWeapon(lvl));
-        for(let i=0; i<8; i++) this.shopStock.armor.push(ItemSystem.createArmor(lvl));
-        for(let i=0; i<6; i++) {
-            const t = ItemSystem.createTrinket(lvl);
-            if (t) this.shopStock.trinket.push(t);
+        const usedWeaponKeys = new Set();
+        for(let i=0; i<20; i++) {
+            let tries = 0;
+            let w = null;
+            while (tries < 10) {
+                w = ItemSystem.createWeapon(lvl);
+                if (!w) break;
+                if (!usedWeaponKeys.has(w.key)) break;
+                tries++;
+            }
+            if (w) {
+                usedWeaponKeys.add(w.key);
+                this.shopStock.weapon.push(w);
+            }
+        }
+        const usedArmorKeys = new Set();
+        for(let i=0; i<20; i++) {
+            let tries = 0;
+            let a = null;
+            while (tries < 10) {
+                a = ItemSystem.createArmor(lvl);
+                if (!a) break;
+                if (!usedArmorKeys.has(a.key)) break;
+                tries++;
+            }
+            if (a) {
+                usedArmorKeys.add(a.key);
+                this.shopStock.armor.push(a);
+            }
+        }
+        const usedTrinketKeys = new Set();
+        for(let i=0; i<20; i++) {
+            let tries = 0;
+            let t = null;
+            while (tries < 10) {
+                t = ItemSystem.createTrinket(lvl);
+                if (!t) break;
+                if (!usedTrinketKeys.has(t.key)) break;
+                tries++;
+            }
+            if (t) {
+                usedTrinketKeys.add(t.key);
+                this.shopStock.trinket.push(t);
+            }
         }
         this.sortShop(this.shopStock.weapon);
         this.sortShop(this.shopStock.armor);
