@@ -9,7 +9,7 @@ const INTRO_SCRIPT = {
     scenes: [
         {
             id: 'scene1',
-            bg: 'assets/images/intro/intro1.png',
+            bg: 'assets/images/intro/intro1.jpeg',
             lines: [
                 { text: 'They stripped you of your name', delay: 500,  fadeIn: 1200, hold: 2500 },
                 { text: 'They took your pride, your freedom your life', delay: 400, fadeIn: 1200, hold: 2700 },
@@ -18,7 +18,7 @@ const INTRO_SCRIPT = {
         },
         {
             id: 'scene2',
-            bg: 'assets/images/intro/intro2.png',
+            bg: 'assets/images/intro/intro2.jpeg',
             lines: [
                 { text: 'But something survived', delay: 700,  fadeIn: 1200, hold: 2400 },
                 { text: 'Pain did not break you it forged you', delay: 400, fadeIn: 1200, hold: 2700 },
@@ -27,7 +27,7 @@ const INTRO_SCRIPT = {
         },
         {
             id: 'scene3',
-            bg: 'assets/images/intro/intro3.png',
+            bg: 'assets/images/intro/intro3.jpeg',
             lines: [
                 { text: 'Now you stand again', delay: 800,  fadeIn: 1200, hold: 2300 },
                 { text: 'Not to beg', delay: 300, fadeIn: 1100, hold: 2000 },
@@ -50,38 +50,6 @@ const BASE_STATS = {
     Beserker: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 },
     Guardian: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 }
 };
-
-// Global UI SFX for hover / select
-const uiSounds = {
-    hover: new Audio('assets/sfx/hover-sound.wav'),
-    select: new Audio('assets/sfx/select-sound.wav')
-};
-
-function playUiHover() {
-    try {
-        uiSounds.hover.currentTime = 0;
-        uiSounds.hover.play();
-    } catch(e) {}
-}
-
-function playUiSelect() {
-    try {
-        uiSounds.select.currentTime = 0;
-        uiSounds.select.play();
-    } catch(e) {}
-}
-
-function wireButtonSfx(root) {
-    const scope = root || document;
-    const btns = scope.querySelectorAll('button, .btn, .c-btn');
-    btns.forEach(b => {
-        if (!b.__sfxBound) {
-            b.addEventListener('mouseenter', playUiHover);
-            b.addEventListener('click', playUiSelect);
-            b.__sfxBound = true;
-        }
-    });
-}
 
 const getArmorIconPath = (item) => {
     if (!item || item.type !== 'armor') return '';
@@ -476,6 +444,7 @@ const game = {
     showHub() {
         document.querySelectorAll('.menu-screen, .hidden').forEach(e => { if(!e.classList.contains('modal-overlay')) e.classList.add('hidden'); });
         $('screen-combat').classList.add('hidden'); $('screen-hub').classList.remove('hidden'); this.updateHubUI();
+        if (typeof stopFightMusic === 'function') stopFightMusic();
         wireButtonSfx($('screen-hub'));
     },
     openStatsHelp() {
@@ -610,6 +579,10 @@ const game = {
     },
     async initIntro() {
         this.initSaves();
+        // Wire SFX for main menu buttons on initial load
+        if (typeof wireButtonSfx === 'function') {
+            wireButtonSfx(document.getElementById('screen-start') || document);
+        }
     },
     async playIntroSequence(forNewGame = false) {
         const introScreen = $('screen-intro');
@@ -1798,6 +1771,7 @@ const combat = {
         const baseArm = Math.max(0, Math.floor(this.enemy.def * 1.2 + this.enemy.vit * 0.8 + s * 2));
         this.enemy.maxArmor = baseArm;
         this.enemy.armor = baseArm;
+        if (typeof playFightMusic === 'function') playFightMusic();
         $('screen-hub').classList.add('hidden'); $('screen-combat').classList.remove('hidden'); $('enemy-think').style.display='none';
         this.log = [];
         this.logMessage(`${this.enemy.name} enters the arena!`);
