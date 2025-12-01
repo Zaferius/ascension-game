@@ -3221,6 +3221,74 @@ const combat = {
             if (e.hp < 0) e.hp = 0;
         }
     },
+    async playCollisionAnimation(type, result) {
+        const playerWrap = document.querySelector('.combat-avatar-player');
+        const enemyWrap = document.querySelector('.combat-avatar-enemy');
+        if (!playerWrap || !enemyWrap) {
+            // Fallback: animasyon yoksa doğrudan sonucu uygula
+            if (result && typeof result.apply === 'function') {
+                result.apply();
+            }
+            return;
+        }
+        const origPlayerTransition = playerWrap.style.transition;
+        const origEnemyTransition = enemyWrap.style.transition;
+        playerWrap.style.transition = 'transform 0.18s ease-out';
+        enemyWrap.style.transition = 'transform 0.18s ease-out';
+
+        const pRect = playerWrap.getBoundingClientRect();
+        const eRect = enemyWrap.getBoundingClientRect();
+        const pCenterY = pRect.top + pRect.height / 2;
+        const eCenterY = eRect.top + eRect.height / 2;
+        const midY = (pCenterY + eCenterY) / 2;
+        const pOffsetY = midY - pCenterY;
+        const eOffsetY = midY - eCenterY;
+
+        let pOffsetX = 0;
+        let eOffsetX = 0;
+
+        // 1) Y ekseninde hizalanma
+        playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY}px)`;
+        enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY}px)`;
+        await wait(200);
+
+        // 2) X ekseninde merkeze doğru hızlanma ve çarpışma noktası
+        const pRect2 = playerWrap.getBoundingClientRect();
+        const eRect2 = enemyWrap.getBoundingClientRect();
+        const pCenterX = pRect2.left + pRect2.width / 2;
+        const eCenterX = eRect2.left + eRect2.width / 2;
+        const midX = (pCenterX + eCenterX) / 2;
+
+        // Merkezde sadece "buluşmak" yerine, biraz birbirlerinin tarafına doğru
+        // fazla gitmelerini sağla ki çarpışma hissi daha güçlü olsun.
+        const extraOverlap = 30; // X ekseninde fazladan ilerleme (px)
+        let targetPlayerX = midX;
+        let targetEnemyX = midX;
+
+        // Player ya da enemy saldırısı fark etmeksizin, çarpışma noktasını
+        // biraz enemy tarafına kaydır (sağ/sol yönler ekrandaki konuma göre).
+        targetPlayerX += extraOverlap;
+        targetEnemyX -= extraOverlap;
+
+        pOffsetX += targetPlayerX - pCenterX;
+        eOffsetX += targetEnemyX - eCenterX;
+
+        playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY}px)`;
+        enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY}px)`;
+        await wait(120);
+
+        // 3) Çarpışma anında sonucu uygula (hit/miss + damage)
+        if (result && typeof result.apply === 'function') {
+            result.apply();
+        }
+
+        // 4) Avatarları eski pozisyonlarına geri kaydır – çarpışma anından hemen sonra
+        playerWrap.style.transform = 'translate(0px, 0px)';
+        enemyWrap.style.transform = 'translate(0px, 0px)';
+        await wait(160);
+        playerWrap.style.transition = origPlayerTransition;
+        enemyWrap.style.transition = origEnemyTransition;
+    },
     async playerAttack(type) {
         // Prevent spamming attack buttons while an action is in progress
         if (this.turn !== 'player' || this.actionLock) return;
@@ -3246,48 +3314,67 @@ const combat = {
         // Etkin vuruş şansını [5,99] aralığında tut
         const effectiveHit = Math.max(5, Math.min(99, hit + bonus));
 
-        if(rng(0,100) <= effectiveHit) {
-            const range = p.getDmgRange();
-            const baseDmg = rng(range.min, range.max);
-            let dmg = Math.floor(baseDmg * mod);
+        const roll = rng(0,100);
+        const didHit = roll <= effectiveHit;
 
-            // Kritik ve Disastrous Hit hesapla
-            const critChance = 5 + p.stats.atk + p.getCritBonus();
-            let isCrit = false;
-            let isDisastrous = false;
+        let attackResult = {
+            apply: () => {
+                if (didHit) {
+                    const range = p.getDmgRange();
+                    const baseDmg = rng(range.min, range.max);
+                    let dmg = Math.floor(baseDmg * mod);
 
-            // Power Attack için: önce bağımsız disastrous şansı, olmazsa normal crit roll
-            if (type === 'power') {
-                const disastrousChancePlayer = 6; // %6 disastrous
-                if (rng(0,100) < disastrousChancePlayer) {
-                    isDisastrous = true;
-                    const critLike = Math.floor(dmg * 1.5); // önce crit benzeri artış
-                    dmg = Math.floor(critLike * 4);        // ardından 4x çarpan (toplam çok yüksek vurur)
-                } else if (rng(0,100) < critChance) {
-                    isCrit = true;
-                    dmg = Math.floor(dmg * 1.5);
+                    // Kritik ve Disastrous Hit hesapla
+                    const critChance = 5 + p.stats.atk + p.getCritBonus();
+                    let isCrit = false;
+                    let isDisastrous = false;
+
+                    // Power Attack için: önce bağımsız disastrous şansı, olmazsa normal crit roll
+                    if (type === 'power') {
+                        const disastrousChancePlayer = 6; // %6 disastrous
+                        if (rng(0,100) < disastrousChancePlayer) {
+                            isDisastrous = true;
+                            const critLike = Math.floor(dmg * 1.5); // önce crit benzeri artış
+                            dmg = Math.floor(critLike * 4);        // ardından 4x çarpan (toplam çok yüksek vurur)
+                        } else if (rng(0,100) < critChance) {
+                            isCrit = true;
+                            dmg = Math.floor(dmg * 1.5);
+                        }
+                    } else {
+                        // Quick / Normal: sadece normal crit şansı
+                        if (rng(0,100) < critChance) {
+                            isCrit = true;
+                            dmg = Math.floor(dmg * 1.5);
+                        }
+                    }
+
+                    this.takeDamage(dmg, 'enemy');
+                    this.showDmg(dmg, 'enemy', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
+                    const label = type==='quick' ? 'Quick' : (type==='power' ? 'Power' : 'Normal');
+                    let critText = '';
+                    if (isDisastrous) critText = ' (DISASTROUS HIT!)';
+                    else if (isCrit) critText = ' (CRIT)';
+                    this.logMessage(`You use ${label} Attack and hit ${e.name} for <span class="log-dmg">${dmg}</span>.${critText}`);
+                    const c=$('game-container'); c.classList.add(shake); setTimeout(()=>c.classList.remove(shake),500);
+                    // Enemy HP 0'a düştüğü anda death cross ikonunu hemen göster
+                    if (e.hp <= 0) {
+                        const cross = $('enemy-death-cross');
+                        if (cross) {
+                            cross.classList.remove('enemy-death-cross-anim');
+                            void cross.offsetWidth; // reflow
+                            cross.classList.add('enemy-death-cross-anim');
+                        }
+                    }
+                } else {
+                    this.showDmg("DODGE", 'enemy', 'miss');
+                    this.logMessage(`Your attack misses ${e.name}.`);
                 }
-            } else {
-                // Quick / Normal: sadece normal crit şansı
-                if (rng(0,100) < critChance) {
-                    isCrit = true;
-                    dmg = Math.floor(dmg * 1.5);
-                }
+                this.updateUI();
             }
+        };
 
-            this.takeDamage(dmg, 'enemy');
-            this.showDmg(dmg, 'enemy', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
-            const label = type==='quick' ? 'Quick' : (type==='power' ? 'Power' : 'Normal');
-            let critText = '';
-            if (isDisastrous) critText = ' (DISASTROUS HIT!)';
-            else if (isCrit) critText = ' (CRIT)';
-            this.logMessage(`You use ${label} Attack and hit ${e.name} for <span class="log-dmg">${dmg}</span>.${critText}`);
-            const c=$('game-container'); c.classList.add(shake); setTimeout(()=>c.classList.remove(shake),500);
-        } else {
-            this.showDmg("DODGE", 'enemy', 'miss');
-            this.logMessage(`Your attack misses ${e.name}.`);
-        }
-        this.updateUI();
+        await this.playCollisionAnimation(type, attackResult);
+
         if(e.hp <= 0) {
             // Enemy HP bar 0'a iner inmez X efekti ve ardından win sekansı
             this.win();
@@ -3308,56 +3395,68 @@ const combat = {
         let hit = this.calcHit(e.atk, p.stats.def);
         // Dodge bonusu sonrası da alt sınırı %5'te tut
         hit = Math.max(5, Math.min(99, hit - p.getDodgeBonus()));
-        if(rng(0,100) <= hit) {
-            const erange = this.getEnemyDmgRange(e);
-            let dmg = rng(erange.min, erange.max);
+        const roll = rng(0,100);
+        const didHit = roll <= hit;
 
-            // Düşman kritik ve Disastrous Hit
-            const critChanceEnemy = 5 + e.atk;
-            let isCrit = false;
-            let isDisastrous = false;
+        let attackResult = {
+            apply: () => {
+                if (didHit) {
+                    const erange = this.getEnemyDmgRange(e);
+                    let dmg = rng(erange.min, erange.max);
 
-            // Önce bağımsız disastrous şansı, olmazsa normal crit roll
-            const disastrousChanceEnemy = 3; // %3 disastrous
-            if (rng(0,100) < disastrousChanceEnemy) {
-                isDisastrous = true;
-                const critLike = Math.floor(dmg * 1.5);
-                dmg = Math.floor(critLike * 4);
-            } else if (rng(0,100) < critChanceEnemy) {
-                isCrit = true;
-                dmg = Math.floor(dmg * 1.5);
-            }
+                    // Düşman kritik ve Disastrous Hit
+                    const critChanceEnemy = 5 + e.atk;
+                    let isCrit = false;
+                    let isDisastrous = false;
 
-            this.takeDamage(dmg, 'player');
-            this.showDmg(dmg, 'player', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
+                    // Önce bağımsız disastrous şansı, olmazsa normal crit roll
+                    const disastrousChanceEnemy = 3; // %3 disastrous
+                    if (rng(0,100) < disastrousChanceEnemy) {
+                        isDisastrous = true;
+                        const critLike = Math.floor(dmg * 1.5);
+                        dmg = Math.floor(critLike * 4);
+                    } else if (rng(0,100) < critChanceEnemy) {
+                        isCrit = true;
+                        dmg = Math.floor(dmg * 1.5);
+                    }
 
-            let extra = '';
-            if (isDisastrous) extra = ' (DISASTROUS HIT!)';
-            else if (isCrit) extra = ' (CRIT)';
+                    this.takeDamage(dmg, 'player');
+                    this.showDmg(dmg, 'player', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
 
-            this.logMessage(`${e.name} hits you for <span class="log-dmg">${dmg}</span>.${extra}`);
-            // chance to apply DOTs based on enemy type, reduced by per-effect resistance
-            if(typeof STATUS_EFFECTS_CONFIG !== 'undefined') {
-                const defs = STATUS_EFFECTS_CONFIG.enemies[e.name];
-                if(defs && Array.isArray(defs)) {
-                    defs.forEach(def => {
-                        const baseChance = def.chance || 0;
-                        const resist = this.dotResist && this.dotResist[def.effect] ? this.dotResist[def.effect] : 0;
-                        const effectiveChance = baseChance * (1 - resist);
-                        if(Math.random() <= effectiveChance) this.applyDot(def.effect);
-                    });
+                    let extra = '';
+                    if (isDisastrous) extra = ' (DISASTROUS HIT!)';
+                    else if (isCrit) extra = ' (CRIT)';
+
+                    this.logMessage(`${e.name} hits you for <span class="log-dmg">${dmg}</span>.${extra}`);
+                    // chance to apply DOTs based on enemy type, reduced by per-effect resistance
+                    if(typeof STATUS_EFFECTS_CONFIG !== 'undefined') {
+                        const defs = STATUS_EFFECTS_CONFIG.enemies[e.name];
+                        if(defs && Array.isArray(defs)) {
+                            defs.forEach(def => {
+                                const baseChance = def.chance || 0;
+                                const resist = this.dotResist && this.dotResist[def.effect] ? this.dotResist[def.effect] : 0;
+                                const effectiveChance = baseChance * (1 - resist);
+                                if(Math.random() <= effectiveChance) this.applyDot(def.effect);
+                            });
+                        }
+                    }
+                    const c=$('game-container'); c.classList.add('shake-sm'); setTimeout(()=>c.classList.remove('shake-sm'),300);
+                    // Player HP 0'a düştüğü anda ölüm sekansını hemen başlat
+                    if (this.hp <= 0 && typeof game.handlePlayerDeath === 'function') {
+                        game.handlePlayerDeath();
+                    }
+                } else {
+                    this.showDmg("DODGE", 'player', 'miss');
+                    this.logMessage(`${e.name}'s attack misses you.`);
                 }
+                this.updateUI();
             }
-            const c=$('game-container'); c.classList.add('shake-sm'); setTimeout(()=>c.classList.remove('shake-sm'),300);
-        } else {
-            this.showDmg("DODGE", 'player', 'miss');
-            this.logMessage(`${e.name}'s attack misses you.`);
-        }
-        this.updateUI();
-        if(this.hp <= 0) {
-            // HP barı sıfırlandığı anda death cross ve bir süre sonra defeat ekranı
-            game.handlePlayerDeath();
-        } else {
+        };
+
+        await this.playCollisionAnimation('enemy', attackResult);
+
+        // Ölmediyse sıradaki turu oyuncuya ver
+        if(this.hp > 0) {
             await wait(500);
             this.setTurn('player');
         }
