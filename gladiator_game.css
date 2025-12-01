@@ -127,6 +127,21 @@ input, select {
 }
 input:focus, select:focus { border-color: var(--accent-green) !important; }
 .create-basic-row { display:flex; align-items:center; gap:10px; }
+.create-avatar {
+    width: 220px;
+    height: 220px;
+    border-radius: 10px;
+    overflow: hidden;
+    background:#111;
+    border: 2px solid #444;
+    box-shadow: 0 0 20px rgba(0,0,0,0.85);
+}
+.create-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display:block;
+}
 .avatar-box {
     width: 90px;
     height: 90px;

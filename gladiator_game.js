@@ -1042,13 +1042,9 @@ const game = {
                 previewBody.innerHTML = lines.join('');
 
                 if (previewIcon) {
-                    if (trinket.iconPath) {
-                        previewIcon.src = trinket.iconPath;
-                        previewIcon.classList.remove('hidden');
-                    } else {
-                        previewIcon.src = '';
-                        previewIcon.classList.add('hidden');
-                    }
+                    // Hub trinket tooltip: always use the shared trinket icon
+                    previewIcon.src = trinket.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
+                    previewIcon.classList.remove('hidden');
                 }
             };
             const movePreview = (ev) => {
@@ -1284,6 +1280,9 @@ const game = {
                     iconPath = getWeaponIconPath(item);
                 } else if (item.type === 'armor') {
                     iconPath = getArmorIconPath(item);
+                } else if (item.type === 'trinket') {
+                    // Trinket katalogunda gelen ikon yolunu kullan, yoksa varsayılan bir trinket ikonu göster
+                    iconPath = item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
                 }
                 if (iconPath) {
                     previewIcon.src = iconPath;
@@ -1367,6 +1366,7 @@ const game = {
 
         const previewBox = $('shop-preview');
         const previewBody = $('shop-preview-body');
+        const previewIcon = $('shop-preview-icon');
         const movePreview = (ev) => {
             if (!previewBox) return;
             const rect = $('game-container').getBoundingClientRect();
@@ -1442,6 +1442,10 @@ const game = {
                         </div>
                     `);
                     previewBody.innerHTML = lines.join('');
+                    if (previewIcon) {
+                        previewIcon.src = 'assets/images/potion-icons/potion-icon.png';
+                        previewIcon.classList.remove('hidden');
+                    }
                     movePreview(ev);
                     previewBox.classList.remove('hidden');
                     previewBox.classList.add('visible');
@@ -1655,13 +1659,18 @@ const game = {
             }
             previewBody.innerHTML = lines.join('');
 
-            // Handle item type icon (weapon / armor)
+            // Handle item type icon (weapon / armor / trinket / potion)
             if (previewIcon) {
                 let iconPath = '';
                 if (item.type === 'weapon') {
                     iconPath = getWeaponIconPath(item);
                 } else if (item.type === 'armor') {
                     iconPath = getArmorIconPath(item);
+                } else if (item.type === 'trinket') {
+                    // All trinkets share the same icon for now
+                    iconPath = item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
+                } else if (item.type === 'potion') {
+                    iconPath = 'assets/images/potion-icons/potion-icon.png';
                 }
                 if (iconPath) {
                     previewIcon.src = iconPath;
