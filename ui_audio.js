@@ -12,36 +12,25 @@ const uiSounds = {
     select: new Audio(uiAudioConfig.selectSrc)
 };
 
-// Fight background music
-const fightMusic = new Audio('assets/sfx/fight-music.mp3');
-fightMusic.loop = true;
+const getUiVolume = () => {
+    // Reuse global AUDIO_LEVELS from sfxConfig.js if available
+    const master = (typeof AUDIO_LEVELS !== 'undefined' && AUDIO_LEVELS.master != null) ? AUDIO_LEVELS.master : 1;
+    const sfx = (typeof AUDIO_LEVELS !== 'undefined' && AUDIO_LEVELS.sfx != null) ? AUDIO_LEVELS.sfx : 1;
+    return Math.max(0, Math.min(1, master * sfx));
+};
 
 function playUiHover() {
     try {
+        uiSounds.hover.volume = getUiVolume();
         uiSounds.hover.currentTime = 0;
         const p = uiSounds.hover.play();
         if (p && typeof p.catch === 'function') p.catch(() => {});
     } catch (e) {}
 }
 
-// Fight music controls
-function playFightMusic() {
-    try {
-        fightMusic.currentTime = 0;
-        const p = fightMusic.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch (e) {}
-}
-
-function stopFightMusic() {
-    try {
-        fightMusic.pause();
-        fightMusic.currentTime = 0;
-    } catch (e) {}
-}
-
 function playUiSelect() {
     try {
+        uiSounds.select.volume = getUiVolume();
         uiSounds.select.currentTime = 0;
         const p = uiSounds.select.play();
         if (p && typeof p.catch === 'function') p.catch(() => {});

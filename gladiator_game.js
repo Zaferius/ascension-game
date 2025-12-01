@@ -3190,8 +3190,8 @@ const combat = {
     },
     takeDamage(amount, target) {
         if(target === 'player') {
-            // Player: önce armor, sonra HP
             let rem = amount;
+            const armorBefore = this.armor || 0;
             if(this.armor > 0) {
                 if(this.armor >= amount) {
                     this.armor -= amount;
@@ -3201,13 +3201,19 @@ const combat = {
                     this.armor = 0;
                 }
             }
-            this.hp -= rem; if(this.hp < 0) this.hp = 0;
-            if(rem > 0) this.flashBlood();
+            const armorDmg = Math.min(armorBefore, amount);
+            const hpDmg = rem;
+            this.hp -= hpDmg; if(this.hp < 0) this.hp = 0;
+            if(armorDmg > 0) playSfx('armorHit');
+            if(hpDmg > 0) {
+                this.flashBlood();
+                playSfx('hpHit');
+            }
         } else {
-            // Enemy: aynı mantık, önce enemy armor, sonra enemy HP
             const e = this.enemy;
             if (!e) return;
             let rem = amount;
+            const armorBefore = e.armor || 0;
             if (e.armor > 0) {
                 if (e.armor >= amount) {
                     e.armor -= amount;
@@ -3217,8 +3223,12 @@ const combat = {
                     e.armor = 0;
                 }
             }
-            e.hp -= rem;
+            const armorDmg = Math.min(armorBefore, amount);
+            const hpDmg = rem;
+            e.hp -= hpDmg;
             if (e.hp < 0) e.hp = 0;
+            if(armorDmg > 0) playSfx('armorHit');
+            if(hpDmg > 0) playSfx('hpHit');
         }
     },
     async playCollisionAnimation(type, result) {
@@ -3319,6 +3329,9 @@ const combat = {
         const distX = eCenterX - pCenterX;
         const attackerFrac = 0.7; // saldıran yine güçlü biçimde öne gelsin
         const dodgeY = (Math.random() < 0.5 ? -1 : 1) * 22; // savunan için küçük yukarı/aşağı kaçış
+
+        // Çarpışma anındaki dodge hareketi başlarken sesi çal
+        playSfx('dodge');
 
         if (attacker === 'enemy') {
             // Enemy öne atılır, player sadece Y ekseninde kaçıyor gibi
