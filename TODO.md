@@ -1,13 +1,8 @@
 -Skill tree - axe mastery - sword mastery ...   
 -Büyücü itemleri büyü yapma olayı
--düsmanlar savas basladıgında - hit yediğinde - hit attıgında konusmaları
--can barları outline bi tık büyütelim.
--her 2 lvl atlamada 1 turnuva. Turnuva sistemi. Turnuvada ölürsen Karakter geberir.
--oyun dengesi testi lazım str abanınca sanki oyun kolaylasıyor.
--ilk dot bize geldiğinde de dot'un renklerinde ekran yansın. Sadece dmg aldıgımızda degil.
---buff veren hicbir item yok suan. handikap olmalı +12 STR - 6 vitality gibi
---DOT hasar bufflarına sahip silahlar.(karakterler degil)
---Fight ses efektleri
+-Shoplara UI polish(opencode biliyor)
+-Trinket Shop ismi Magic Shop olarak değişir. Silahlara büyü basma yeri ve Trinket burda satılır. THE PIT Uı'ı gibi 2 kutu yanyana buton. DOT Hasarı karakterlerden cıkıp silahlara verilir bu sayede
+-1v2 UI düzeni polish lazım. 2 kisi sagda ortalansın. Seçim için çıkan dairede sayı yazmasın. Avatarlar üst üste geliyor düzelsin. 
 
 
 -perhance enemy avatar seed: //// (seed:::876714083)

@@ -77,6 +77,11 @@ const BASE_STATS = {
     Beserker: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 },
     Guardian: { str: 1, atk: 1, def: 1, vit: 1, mag: 1, chr: 1 }
 };
+const STATUS_TOAST_COLORS = {
+    poison: '#76ff03',
+    burn: '#ff9100',
+    bleed: '#ff5252'
+};
 
 const getArmorIconPath = (item) => {
     if (!item || item.type !== 'armor') return '';
@@ -333,7 +338,7 @@ class Player {
 }
 
 const game = {
-    player: null, selectedAvatar: 0, shopStock: { weapon: [], armor: [], trinket: [] }, shopSortOrder: 'desc', shopSortKey: 'price', currentShopType: 'weapon', codexFilter: 'weapon',
+    player: null, selectedAvatar: 0, shopStock: { weapon: [], armor: [], trinket: [] }, shopSortOrder: 'desc', shopSortKey: 'price', currentShopType: 'weapon', currentTradeMode: 'buy', codexFilter: 'weapon', currentPitMode: 'duel',
     // Potion shop state
     potionStock: {},
     saveSlots: [], lastSlot: -1, currentSlotIndex: -1,
@@ -598,7 +603,7 @@ const game = {
         this.potionStock = {};
         POTION_DEFS.forEach(def => {
             const qty = rng(1, 10);
-            const price = def.priceFactor * lvl;
+            const price = Math.max(6, Math.floor(def.priceFactor * (0.75 + lvl * 0.65)));
             this.potionStock[def.key] = {
                 key: def.key,
                 qty,
@@ -616,6 +621,44 @@ const game = {
         if (remaining < 0) remaining = 0;
         const label = remaining === 1 ? 'fight' : 'fights';
         el.innerHTML = `Potions refresh in <span class="shop-refresh-count">${remaining}</span> ${label}`;
+    },
+    addPotionToInventory(potionLike, qty = 1) {
+        if (!this.player || !potionLike || qty <= 0) return;
+        if (!Array.isArray(this.player.inventory)) this.player.inventory = [];
+        const inv = this.player.inventory;
+        const subType = potionLike.subType;
+        const percent = potionLike.percent || 0;
+        const name = potionLike.name || '';
+        const existing = inv.find(it => it && it.type === 'potion' && it.subType === subType && (it.percent || 0) === percent && it.name === name);
+        if (existing) {
+            existing.qty = (existing.qty || 0) + qty;
+        } else {
+            inv.push({
+                id: Date.now() + Math.random(),
+                type: 'potion',
+                subType,
+                percent,
+                name,
+                price: potionLike.price,
+                qty,
+                rarity: potionLike.rarity || 'rarity-common'
+            });
+        }
+    },
+    consumePotionFromInventory(potionLike, qty = 1) {
+        if (!this.player || !potionLike || qty <= 0 || !Array.isArray(this.player.inventory)) return false;
+        const inv = this.player.inventory;
+        const subType = potionLike.subType;
+        const percent = potionLike.percent || 0;
+        const name = potionLike.name || '';
+        const existing = inv.find(it => it && it.type === 'potion' && it.subType === subType && (it.percent || 0) === percent && it.name === name && (it.qty || 0) >= qty);
+        if (!existing) return false;
+        existing.qty = (existing.qty || 0) - qty;
+        if (existing.qty <= 0) {
+            const idx = inv.indexOf(existing);
+            if (idx !== -1) inv.splice(idx, 1);
+        }
+        return true;
     },
     addTestGold(amount = 100) {
         if(!this.player) return;
@@ -712,6 +755,7 @@ const game = {
             if (type === 'weapon') list = this.shopStock.weapon;
             else if (type === 'armor') list = this.shopStock.armor;
             else if (type === 'trinket') list = this.shopStock.trinket;
+            else if (type === 'potion') list = this.getFilteredSellItems();
             else list = this.shopStock.weapon;
             this.sortShop(list);
             this.renderList(list, 'shop'); $('shop-gold').innerText = this.player.gold;
@@ -720,6 +764,86 @@ const game = {
             this.sortShop(list);
             this.renderList(list, 'inv'); $('shop-gold').innerText = this.player.gold;
         }
+    },
+    getTradeModeLabel(mode) {
+        return mode === 'sell' ? 'Sell' : 'Buy';
+    },
+    updateTradeToggleUI() {
+        const btn = $('btn-trade-toggle');
+        if (!btn) return;
+        const inShop = this.currentListMode === 'shop' || this.currentListMode === 'potion';
+        if (!inShop) {
+            btn.classList.add('hidden');
+            return;
+        }
+        btn.classList.remove('hidden');
+        const nextMode = this.currentTradeMode === 'buy' ? 'sell' : 'buy';
+        btn.textContent = this.getTradeModeLabel(nextMode);
+        btn.classList.toggle('btn-primary', this.currentTradeMode === 'sell');
+    },
+    getFilteredSellItems() {
+        if (!this.player || !Array.isArray(this.player.inventory)) return [];
+        const type = this.currentShopType || 'weapon';
+        return this.player.inventory.filter(item => {
+            if (!item) return false;
+            if (type === 'potion') return item.type === 'potion';
+            return item.type === type;
+        });
+    },
+    getSellPrice(item) {
+        if (!item) return 0;
+        if (item.type === 'potion') {
+            const def = POTION_DEFS.find(p => p.subType === item.subType && p.percent === (item.percent || 0));
+            const basePrice = typeof item.price === 'number' ? item.price : (def ? Math.max(6, Math.floor(def.priceFactor * (0.75 + (this.player?.level || 1) * 0.65))) : 8);
+            return Math.max(1, Math.floor(basePrice * 0.5));
+        }
+        const minLvl = typeof item.minLevel === 'number' ? item.minLevel : (typeof item.minShopLevel === 'number' ? item.minShopLevel : 1);
+        const basePrice = typeof item.price === 'number' ? item.price : Math.max(10, minLvl * 12);
+        return Math.max(1, Math.floor(basePrice * 0.45));
+    },
+    sellItem(item) {
+        if (!this.player || !item || !Array.isArray(this.player.inventory)) return;
+        const inv = this.player.inventory;
+        const sellPrice = this.getSellPrice(item);
+        if (item.type === 'potion') {
+            const existing = inv.find(it => it && it.type === 'potion' && it.subType === item.subType && (it.percent || 0) === (item.percent || 0) && it.name === item.name);
+            if (!existing) return;
+            existing.qty = (existing.qty || 0) - 1;
+            if (existing.qty <= 0) inv.splice(inv.indexOf(existing), 1);
+        } else {
+            const idx = inv.indexOf(item);
+            if (idx === -1) return;
+            inv.splice(idx, 1);
+        }
+        this.player.gold += sellPrice;
+        $('shop-gold').innerText = this.player.gold;
+        if (this.currentShopType === 'potion' && this.currentTradeMode === 'buy') this.renderPotionShop();
+        else this.renderList([], 'shop');
+        this.updateHubUI();
+        this.saveGame();
+    },
+    toggleTradeMode() {
+        const inShop = this.currentListMode === 'shop' || this.currentListMode === 'potion';
+        if (!inShop) return;
+        this.currentTradeMode = this.currentTradeMode === 'buy' ? 'sell' : 'buy';
+        if (this.currentShopType === 'potion') this.renderPotionShop();
+        else this.renderList([], 'shop');
+        if (this.player) $('shop-gold').innerText = this.player.gold;
+    },
+    openPitMenu() {
+        const modal = $('modal-pit');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (typeof wireButtonSfx === 'function') wireButtonSfx(modal);
+    },
+    closePitMenu() {
+        const modal = $('modal-pit');
+        if (modal) modal.classList.add('hidden');
+    },
+    selectPitMode(mode) {
+        this.currentPitMode = mode === 'no_armor' ? 'no_armor' : (mode === 'duo' ? 'duo' : 'duel');
+        this.closePitMenu();
+        combat.init(this.currentPitMode);
     },
     showHub() {
         // Hide all menu screens except hub, stop combat music, refresh hub UI
@@ -864,7 +988,104 @@ const game = {
         $('screen-creation').classList.remove('hidden');
         this.createCharacter();
     },
+    ensurePreviewHelpers() {
+        if (typeof this._buildItemPreview === 'function' && typeof this._moveItemPreview === 'function') return;
+        const previewBox = $('shop-preview');
+        const previewBody = $('shop-preview-body');
+        const previewIcon = $('shop-preview-icon');
+        const getItemMinLevel = (item) => {
+            if (!item) return 1;
+            if (typeof item.minLevel === 'number') return item.minLevel;
+            if (typeof item.minShopLevel === 'number') return item.minShopLevel;
+            return 1;
+        };
+        const getWeaponPreviewIconPath = (item) => {
+            if (!item || item.type !== 'weapon') return '';
+            const cls = (item.weaponClass || '').toLowerCase();
+            const baseLower = (item.baseType || '').toLowerCase();
+            if (cls === 'axe' || baseLower.includes('axe')) return 'assets/weapon-icons/axe_icon.png';
+            if (cls === 'sword' || baseLower.includes('blade') || baseLower.includes('sword')) return 'assets/weapon-icons/sword_icon.png';
+            if (cls === 'hammer' || baseLower.includes('hammer') || baseLower.includes('mace')) return 'assets/weapon-icons/hammer_icon.png';
+            if (cls === 'dagger' || baseLower.includes('dagger')) return 'assets/weapon-icons/dagger_icon.png';
+            if (cls === 'spear' || baseLower.includes('spear') || baseLower.includes('halberd')) return 'assets/weapon-icons/spear_icon.png';
+            if (cls === 'bow' || baseLower.includes('bow') || baseLower.includes('crossbow')) return 'assets/weapon-icons/crossbow_icon.png';
+            return '';
+        };
+        this._buildItemPreview = (item) => {
+            if (!item || !previewBody) return;
+            const rarityText = (item.rarity || '').replace('rarity-', '');
+            const minLvl = getItemMinLevel(item);
+            let lines = [];
+            lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
+            if (item.type === 'weapon') {
+                if (typeof item.min === 'number' && typeof item.max === 'number') lines.push(`<div><span class="text-orange">Damage:</span> ${item.min}-${item.max}</div>`);
+                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+            } else if (item.type === 'armor') {
+                const val = (typeof item.val === 'number') ? item.val : 0;
+                lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
+                if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
+            } else if (item.type === 'trinket') {
+                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+            }
+            if (item.statMods) {
+                const map = [
+                    { key: 'str', label: 'Strength', cls: 'text-orange' },
+                    { key: 'atk', label: 'Attack', cls: 'text-red' },
+                    { key: 'def', label: 'Defence', cls: 'text-blue' },
+                    { key: 'vit', label: 'Vitality', cls: 'text-green' },
+                    { key: 'mag', label: 'Magicka', cls: 'text-purple' },
+                    { key: 'chr', label: 'Charisma', cls: 'text-gold' }
+                ];
+                const modLines = [];
+                map.forEach(({ key, label, cls }) => {
+                    const v = item.statMods[key];
+                    if (typeof v === 'number' && v !== 0) {
+                        const sign = v > 0 ? '+' : '';
+                        modLines.push(`<div class="${cls}">${sign}${v} ${label}</div>`);
+                    }
+                });
+                if (modLines.length) {
+                    lines.push('<div style="margin-top:6px; font-size:0.85rem;">');
+                    lines = lines.concat(modLines);
+                    lines.push('</div>');
+                }
+            }
+            lines.push(`<div style="margin-top:6px; font-size:0.8rem; color:#aaa; display:flex; justify-content:space-between; align-items:center;"><span>Rarity: ${rarityText}</span><span class="text-gold" style="font-size:0.95rem;">Lvl ${minLvl}</span></div>`);
+            if (item.info) {
+                const infoClass = item.infoColor || 'text-gold';
+                lines.push(`<div class="${infoClass}" style="margin-top:4px; font-size:0.8rem; font-style:italic;">${item.info}</div>`);
+            }
+            previewBody.innerHTML = lines.join('');
+            if (previewIcon) {
+                let iconPath = '';
+                if (item.type === 'weapon') iconPath = getWeaponPreviewIconPath(item);
+                else if (item.type === 'armor') iconPath = getArmorIconPath(item);
+                else if (item.type === 'trinket') iconPath = item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
+                if (iconPath) {
+                    previewIcon.src = iconPath;
+                    previewIcon.classList.remove('hidden');
+                } else {
+                    previewIcon.src = '';
+                    previewIcon.classList.add('hidden');
+                }
+            }
+        };
+        this._moveItemPreview = (ev) => {
+            if (!previewBox) return;
+            const rect = $('game-container').getBoundingClientRect();
+            const offsetX = 28, offsetY = 25;
+            let x = ev.clientX - rect.left + offsetX;
+            let y = ev.clientY - rect.top + offsetY;
+            const maxX = rect.width - 340;
+            const maxY = rect.height - 160;
+            x = Math.max(10, Math.min(maxX, x));
+            y = Math.max(10, Math.min(maxY, y));
+            previewBox.style.left = x + 'px';
+            previewBox.style.top = y + 'px';
+        };
+    },
     updateHubUI() {
+        this.ensurePreviewHelpers();
         const p = this.player;
         $('ui-name').innerText = p.name; $('ui-lvl').innerText = p.level; $('ui-gold').innerText = p.gold;
         const avatarImg = $('ui-avatar');
@@ -895,17 +1116,6 @@ const game = {
         const magBonus = effMag - p.stats.mag;
         const chrBase = (p.stats.chr ?? 0);
         const chrBonus = effChr - chrBase;
-
-        $('ui-stats').innerHTML = `
-            <div class="stat-row"><span>Strength</span> <span class="text-orange">${effStr}${strBonus>0?` <small>(base ${p.stats.str} +${strBonus})</small>`:''}</span></div>
-            <div class="stat-row"><span>Attack</span> <span class="text-red">${effAtk}${atkBonus>0?` <small>(base ${p.stats.atk} +${atkBonus})</small>`:''}</span></div>
-            <div class="stat-row"><span>Defence</span> <span class="text-blue">${effDef}${defBonus>0?` <small>(base ${p.stats.def} +${defBonus})</small>`:''}</span></div>
-            <div class="stat-row"><span>Vitality</span> <span class="text-green">${effVit}${vitBonus>0?` <small>(base ${p.stats.vit} +${vitBonus})</small>`:''}</span></div>
-            <div class="stat-row"><span>Magicka</span> <span class="text-purple">${effMag}${magBonus>0?` <small>(base ${p.stats.mag} +${magBonus})</small>`:''}</span></div>
-            <div class="stat-row"><span>Charisma</span> <span class="text-gold">${effChr}${chrBonus>0?` <small>(base ${chrBase} +${chrBonus})</small>`:''}</span></div>
-            <div style="margin-top:10px; color:#fff; font-size:0.8rem; text-align:center;">Health: ${p.getMaxHp()} | <span class="text-shield">Armor: ${arm}</span></div>
-            <div style="margin-top:4px; color:#ff9100; font-size:0.8rem; text-align:center;">Melee Damage: ${dmg.min}-${dmg.max}</div>
-        `;
 
         // Equipment Lists
         const renderSlot = (slot, title) => {
@@ -963,23 +1173,14 @@ const game = {
         const previewBox = $('shop-preview');
         const previewBody = $('shop-preview-body');
         const previewIcon = $('shop-preview-icon');
+        const buildPreviewFromItem = this._buildItemPreview;
+        const sharedMovePreview = this._moveItemPreview;
 
         const wireWeaponHover = () => {
             const wName = $('hub-weapon-name');
             const weapon = p.gear.weapon;
-            if (!wName || !weapon || !previewBox || !previewBody) return;
-            const movePreview = (ev) => {
-                const rect = $('game-container').getBoundingClientRect();
-                const offsetX = 28, offsetY = 25;
-                let x = ev.clientX - rect.left + offsetX;
-                let y = ev.clientY - rect.top + offsetY;
-                const maxX = rect.width - 340;
-                const maxY = rect.height - 160;
-                x = Math.max(10, Math.min(maxX, x));
-                y = Math.max(10, Math.min(maxY, y));
-                previewBox.style.left = x + 'px';
-                previewBox.style.top = y + 'px';
-            };
+            if (!wName || !weapon || !previewBox || !previewBody || typeof buildPreviewFromItem !== 'function') return;
+            const movePreview = sharedMovePreview;
             wName.onmouseenter = (ev) => {
                 buildPreviewFromItem(weapon);
                 movePreview(ev);
@@ -995,7 +1196,7 @@ const game = {
         }
         const setupTrinketHover = (elId, trinket) => {
             const el = $(elId);
-            if (!el || !trinket || !previewBox || !previewBody) return;
+            if (!el || !trinket || !previewBox || !previewBody || typeof sharedMovePreview !== 'function') return;
             const buildPreview = () => {
                 const rarityText = (trinket.rarity || '').replace('rarity-','');
                 const lines = [];
@@ -1047,27 +1248,14 @@ const game = {
                     previewIcon.classList.remove('hidden');
                 }
             };
-            const movePreview = (ev) => {
-                const rect = $('game-container').getBoundingClientRect();
-                const offsetX = 28, offsetY = 25;
-                let x = ev.clientX - rect.left + offsetX;
-                let y = ev.clientY - rect.top + offsetY;
-                const maxX = rect.width - 340;
-                const maxY = rect.height - 160;
-                x = Math.max(10, Math.min(maxX, x));
-                y = Math.max(10, Math.min(maxY, y));
-                previewBox.style.left = x + 'px';
-                previewBox.style.top = y + 'px';
-            };
-
             el.onmouseenter = (ev) => {
                 buildPreview();
-                movePreview(ev);
+                sharedMovePreview(ev);
                 previewBox.classList.remove('hidden');
                 previewBox.classList.add('visible');
             };
             el.onmousemove = (ev) => {
-                if (previewBox.classList.contains('visible')) movePreview(ev);
+                if (previewBox.classList.contains('visible')) sharedMovePreview(ev);
             };
             el.onmouseleave = () => {
                 previewBox.classList.remove('visible');
@@ -1088,6 +1276,7 @@ const game = {
         }
         // remember which category is currently open so sorting works on the right list
         this.currentShopType = type;
+        this.currentTradeMode = 'buy';
         let list;
         if (type === 'weapon') list = this.shopStock.weapon;
         else if (type === 'armor') list = this.shopStock.armor;
@@ -1103,12 +1292,15 @@ const game = {
         this.sortShop(list);
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
         this.renderList(list, 'shop'); $('shop-gold').innerText = this.player.gold;
+        this.updateTradeToggleUI();
         // Normal shop açıldığında standart shop refresh bilgisini göster
         this.updateShopRefreshIndicator();
         wireButtonSfx($('screen-list'));
     },
     openPotionShop() {
         if (!this.player) return;
+        this.currentShopType = 'potion';
+        this.currentTradeMode = 'buy';
         // Track that we're in potion shop mode so sorting works on the correct list
         this.currentListMode = 'potion';
         // Refresh potion stock if needed or if empty
@@ -1118,13 +1310,16 @@ const game = {
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
         this.renderPotionShop();
         $('shop-gold').innerText = this.player.gold;
+        this.updateTradeToggleUI();
         this.updatePotionRefreshIndicator();
         wireButtonSfx($('screen-list'));
     },
     openInventory() {
+        this.currentTradeMode = 'buy';
         $('screen-hub').classList.add('hidden'); $('screen-list').classList.remove('hidden');
         this.currentInvFilter = this.currentInvFilter || 'all';
         this.renderList(this.player.inventory, 'inv'); $('shop-gold').innerText = this.player.gold;
+        this.updateTradeToggleUI();
         wireButtonSfx($('screen-list'));
     },
     openCodex(type = 'weapon') {
@@ -1348,9 +1543,23 @@ const game = {
         const titleEl = $('list-title');
         const headerExtra = $('list-header-extra');
         if (!cont || !titleEl) return;
-        titleEl.innerText = 'POTION SHOP';
+        titleEl.innerText = this.currentTradeMode === 'sell' ? 'POTION SHOP - SELL' : 'POTION SHOP';
         if (headerExtra) headerExtra.innerHTML = '';
         cont.innerHTML = '';
+        this.updateTradeToggleUI();
+
+        if (headerExtra) {
+            const info = document.createElement('div');
+            info.style.color = '#888';
+            info.style.fontSize = '0.82rem';
+            info.textContent = this.currentTradeMode === 'sell' ? 'Sell potions from your inventory.' : 'Browse the apothecary stock.';
+            headerExtra.appendChild(info);
+        }
+
+        if (this.currentTradeMode === 'sell') {
+            this.renderList([], 'shop');
+            return;
+        }
 
         // Potion shop açıkken inventory'ye özel potion slot kartını gizle
         const slotCard = $('inv-potion-slots-card');
@@ -1463,25 +1672,14 @@ const game = {
                     if (entry.qty <= 0 || this.player.gold < entry.price) return;
                     this.player.gold -= entry.price;
                     entry.qty -= 1;
-                    // Stack potions in inventory instead of creating separate rows
-                    if (!Array.isArray(this.player.inventory)) this.player.inventory = [];
-                    const inv = this.player.inventory;
-                    const existing = inv.find(it => it && it.type === 'potion' && it.subType === tpl.subType && it.percent === tpl.percent && it.name === tpl.name);
-                    if (existing) {
-                        existing.qty = (existing.qty || 1) + 1;
-                    } else {
-                        const item = {
-                            id: Date.now() + Math.random(),
-                            type: 'potion',
-                            subType: tpl.subType,
-                            percent: tpl.percent,
-                            name: tpl.name,
-                            price: entry.price,
-                            qty: 1,
-                            rarity: 'rarity-common'
-                        };
-                        inv.push(item);
-                    }
+                    this.addPotionToInventory({
+                        type: 'potion',
+                        subType: tpl.subType,
+                        percent: tpl.percent,
+                        name: tpl.name,
+                        price: entry.price,
+                        rarity: 'rarity-common'
+                    }, 1);
                     // Re-render potion shop row / list
                     this.renderPotionShop();
                     $('shop-gold').innerText = this.player.gold;
@@ -1500,9 +1698,18 @@ const game = {
             const type = this.currentShopType || 'weapon';
             let title = 'SHOP';
             if (type === 'weapon') title = 'WEAPONSMITH';
-            else if (type === 'armor') title = 'ARMORY';
+            else if (type === 'armor') title = 'ARMOR';
             else if (type === 'trinket') title = 'TRINKET SHOP';
+            else if (type === 'potion') title = 'POTION SHOP';
+            if (this.currentTradeMode === 'sell') title += ' - SELL';
             $('list-title').innerText = title;
+            if (header) {
+                const info = document.createElement('div');
+                info.style.color = '#888';
+                info.style.fontSize = '0.82rem';
+                info.textContent = this.currentTradeMode === 'sell' ? 'Sell matching inventory items.' : 'Browse this shop stock.';
+                header.appendChild(info);
+            }
         } else {
             $('list-title').innerText = 'INVENTORY';
             // Inventory filter buttons: All / Weapons / Armors / Trinkets
@@ -1697,9 +1904,11 @@ const game = {
 
         // In inventory view, show equipped items at the top with Unequip buttons
         if(mode === 'inv') {
+            const activeFilter = this.currentInvFilter || 'all';
             const addEquippedRow = (slot, title) => {
                 const equipped = this.player.gear[slot];
                 if(!equipped) return;
+                if (activeFilter !== 'all' && equipped.type !== activeFilter) return;
                 const isWeapon = equipped.type === 'weapon';
                 const baseLower = (equipped.baseType || '').toLowerCase();
                 const isLegendary = isWeapon && equipped.rarityKey === 'legendary';
@@ -1748,6 +1957,10 @@ const game = {
 
         // Apply inventory filter when in inventory mode
         let listItems = items;
+        if (mode === 'shop' && this.currentTradeMode === 'sell') {
+            listItems = this.getFilteredSellItems();
+            this.sortShop(listItems);
+        }
         if (mode === 'inv' && this.currentInvFilter && this.currentInvFilter !== 'all') {
             listItems = items.filter(it => it.type === this.currentInvFilter);
         }
@@ -1793,18 +2006,19 @@ const game = {
                 nameHtml = `${item.name}`;
             }
             // Potions: show stack count as "Name x N" in inventory, with glowing counter
-            if (mode === 'inv' && item.type === 'potion') {
+            if ((mode === 'inv' || (mode === 'shop' && this.currentTradeMode === 'sell')) && item.type === 'potion') {
                 const qty = item.qty || 1;
                 nameHtml = `${item.name} <span class="potion-stock-count">x ${qty}</span>`;
             }
             let btnTxt;
-            if (mode === 'shop') btnTxt = 'Buy';
+            if (mode === 'shop') btnTxt = this.currentTradeMode === 'sell' ? 'Sell' : 'Buy';
             else if (item.type === 'potion') btnTxt = 'Equip';
             else btnTxt = 'Equip';
-            const priceTxt = mode === 'shop' ? `${item.price}` : '-';
+            const tradePrice = mode === 'shop' ? (this.currentTradeMode === 'sell' ? this.getSellPrice(item) : item.price) : '-';
+            const priceTxt = mode === 'shop' ? `${tradePrice}` : '-';
             let btnState = "";
             if (mode === 'shop') {
-                if (!lvlOk || this.player.gold < item.price) btnState = "disabled";
+                if (this.currentTradeMode === 'buy' && (!lvlOk || this.player.gold < item.price)) btnState = "disabled";
             }
             const btnClass = mode === 'shop' ? 'btn btn-buy' : 'btn';
 
@@ -1840,6 +2054,10 @@ const game = {
             
             div.querySelector('button').onclick = () => {
                 if(mode === 'shop') {
+                    if (this.currentTradeMode === 'sell') {
+                        this.sellItem(item);
+                        return;
+                    }
                     if(this.player.gold >= item.price) {
                         this.player.gold -= item.price;
                         // Auto-equip if corresponding slot is empty
@@ -1877,11 +2095,19 @@ const game = {
                             return;
                         }
 
-                        // Sadece konfigurasyon: tip/percent/name bilgisini slota yaz
+                        if (!this.consumePotionFromInventory(item, 1)) {
+                            alert('Potion not found in inventory.');
+                            this.renderList(this.player.inventory, mode);
+                            return;
+                        }
+
                         slots[freeIndex] = {
                             subType: item.subType,
                             percent: item.percent,
-                            name: item.name
+                            name: item.name,
+                            rarity: item.rarity || 'rarity-common',
+                            price: item.price,
+                            used: false
                         };
 
                         this.renderList(this.player.inventory, mode);
@@ -1936,26 +2162,7 @@ const game = {
                     } else {
                         btn.onclick = () => {
                             if (!this.player || !Array.isArray(this.player.potionSlots)) return;
-                            // Return one charge of this potion back to inventory stack
-                            if (!Array.isArray(this.player.inventory)) this.player.inventory = [];
-                            const inv = this.player.inventory;
-                            const subType = slot.subType;
-                            const percent = slot.percent || 0;
-                            const name = slot.name || '';
-                            const existing = inv.find(it => it && it.type === 'potion' && it.subType === subType && it.percent === percent && it.name === name);
-                            if (existing) {
-                                existing.qty = (existing.qty || 1) + 1;
-                            } else {
-                                inv.push({
-                                    id: Date.now() + Math.random(),
-                                    type: 'potion',
-                                    subType,
-                                    percent,
-                                    name,
-                                    qty: 1,
-                                    rarity: 'rarity-common'
-                                });
-                            }
+                            game.addPotionToInventory(slot, 1);
                             this.player.potionSlots[idx] = null;
                             this.renderList(this.player.inventory, 'inv');
                         };
@@ -2149,6 +2356,109 @@ const game = {
         this.openLoadMenu();
     },
     openStatsHelp() {
+        this.ensurePreviewHelpers();
+        if (this.player) {
+            const p = this.player;
+            const effStr = p.getEffectiveStr();
+            const effAtk = p.getEffectiveAtk();
+            const effVit = p.getEffectiveVit();
+            const effDef = p.getEffectiveDef();
+            const effMag = p.getEffectiveMag();
+            const effChr = p.getEffectiveChr();
+            const values = $('modal-stats-values');
+            const combat = $('modal-stats-combat');
+            const summary = $('modal-stats-summary');
+            const dmg = p.getDmgRange();
+            const hp = p.getMaxHp();
+            const armor = p.getTotalArmor();
+            const regen = p.getRegen();
+            const gearStr = p.getGearStatBonus('str');
+            const gearAtk = p.getGearStatBonus('atk');
+            const gearDef = p.getGearStatBonus('def');
+            const gearVit = p.getGearStatBonus('vit');
+            const gearMag = p.getGearStatBonus('mag');
+            const gearChr = p.getGearStatBonus('chr');
+            const guardianVitPassive = p.class === 'Guardian' ? Math.floor((p.stats.vit + gearVit) / 3) : 0;
+            const warriorAtkPassive = p.class === 'Warrior' ? Math.floor((p.stats.atk + gearAtk) / 3) : 0;
+            const berserkerStrPassive = p.class === 'Beserker' ? Math.floor((p.stats.str + gearStr) / 3) : 0;
+            const weapon = p.gear.weapon;
+            const weaponMin = weapon ? weapon.min : 2;
+            const weaponMax = weapon ? weapon.max : 4;
+            const strDamageBonus = effStr * 2;
+            const rawArmor = ARMOR_SLOTS.reduce((sum, slot) => sum + ((p.gear[slot] && p.gear[slot].val) || 0), 0);
+            const armorMultiplier = p.getArmorMultiplier();
+            const hpMultiplier = p.getHpMultiplier();
+            const row = (label, value, cls, base) => {
+                const bonus = typeof base === 'number' ? value - base : 0;
+                const bonusText = bonus > 0 ? ` <small>(base ${base} +${bonus})</small>` : '';
+                return `<div class="stat-row"><span>${label}</span><span class="${cls}">${value}${bonusText}</span></div>`;
+            };
+            const hoverRow = (id, label, value, cls, base) => {
+                const bonus = typeof base === 'number' ? value - base : 0;
+                const bonusText = bonus > 0 ? ` <small>(base ${base} +${bonus})</small>` : '';
+                return `<div id="${id}" class="stat-row stat-hover-row"><span>${label}</span><span class="${cls}">${value}${bonusText}</span></div>`;
+            };
+            if (values) {
+                values.innerHTML = [
+                    hoverRow('stat-core-str', 'Strength', effStr, 'text-orange', p.stats.str),
+                    hoverRow('stat-core-atk', 'Attack', effAtk, 'text-red', p.stats.atk),
+                    hoverRow('stat-core-def', 'Defence', effDef, 'text-blue', p.stats.def),
+                    hoverRow('stat-core-vit', 'Vitality', effVit, 'text-green', p.stats.vit),
+                    hoverRow('stat-core-mag', 'Magicka', effMag, 'text-purple', p.stats.mag),
+                    hoverRow('stat-core-chr', 'Charisma', effChr, 'text-gold', p.stats.chr ?? 0)
+                ].join('');
+            }
+            if (combat) {
+                combat.innerHTML = `
+                    <div id="stat-combat-hp" class="stat-row stat-hover-row"><span>Health</span><span class="text-red">${hp}</span></div>
+                    <div id="stat-combat-armor" class="stat-row stat-hover-row"><span>Armor</span><span class="text-shield">${armor}</span></div>
+                    <div id="stat-combat-dmg" class="stat-row stat-hover-row"><span>Melee Damage</span><span class="text-orange">${dmg.min}-${dmg.max}</span></div>
+                    <div id="stat-combat-regen" class="stat-row stat-hover-row"><span>Regen / Turn</span><span class="text-green">${regen}</span></div>
+                `;
+            }
+            if (summary) {
+                summary.innerHTML = `${p.name}<br><span>Level ${p.level} - ${p.xp || 0} / ${p.xpMax || 100} XP</span>`;
+            }
+
+            const previewBox = $('shop-preview');
+            const previewBody = $('shop-preview-body');
+            const previewIcon = $('shop-preview-icon');
+            const movePreview = this._moveItemPreview;
+            const hoverMap = {
+                'stat-core-str': `<div class="shop-preview-title">Strength Breakdown</div><div>Base: <span class="text-orange">${p.stats.str}</span></div><div>Gear Bonus: <span class="text-orange">${gearStr >= 0 ? '+' : ''}${gearStr}</span></div><div>Class Passive: <span class="text-orange">${berserkerStrPassive >= 0 ? '+' : ''}${berserkerStrPassive}</span></div><div style="margin-top:6px; color:#aaa;">Every point contributes <span class="text-orange">+2</span> melee damage.</div>`,
+                'stat-core-atk': `<div class="shop-preview-title">Attack Breakdown</div><div>Base: <span class="text-red">${p.stats.atk}</span></div><div>Gear Bonus: <span class="text-red">${gearAtk >= 0 ? '+' : ''}${gearAtk}</span></div><div>Class Passive: <span class="text-red">${warriorAtkPassive >= 0 ? '+' : ''}${warriorAtkPassive}</span></div><div style="margin-top:6px; color:#aaa;">Raises hit chance and crit chance in combat.</div>`,
+                'stat-core-def': `<div class="shop-preview-title">Defence Breakdown</div><div>Base: <span class="text-blue">${p.stats.def}</span></div><div>Gear Bonus: <span class="text-blue">${gearDef >= 0 ? '+' : ''}${gearDef}</span></div><div style="margin-top:6px; color:#aaa;">Reduces enemy hit chance against you.</div>`,
+                'stat-core-vit': `<div class="shop-preview-title">Vitality Breakdown</div><div>Base: <span class="text-green">${p.stats.vit}</span></div><div>Gear Bonus: <span class="text-green">${gearVit >= 0 ? '+' : ''}${gearVit}</span></div><div>Class Passive: <span class="text-green">${guardianVitPassive >= 0 ? '+' : ''}${guardianVitPassive}</span></div><div style="margin-top:6px; color:#aaa;">Drives max health and regeneration.</div>`,
+                'stat-core-mag': `<div class="shop-preview-title">Magicka Breakdown</div><div>Base: <span class="text-purple">${p.stats.mag}</span></div><div>Gear Bonus: <span class="text-purple">${gearMag >= 0 ? '+' : ''}${gearMag}</span></div><div style="margin-top:6px; color:#aaa;">Reserved for future spells and special systems.</div>`,
+                'stat-core-chr': `<div class="shop-preview-title">Charisma Breakdown</div><div>Base: <span class="text-gold">${p.stats.chr ?? 0}</span></div><div>Gear Bonus: <span class="text-gold">${gearChr >= 0 ? '+' : ''}${gearChr}</span></div><div style="margin-top:6px; color:#aaa;">Improves economy and combat rewards.</div>`,
+                'stat-combat-hp': `<div class="shop-preview-title">Health Formula</div><div>Base Health Seed: <span class="text-red">12</span></div><div>Vitality Contribution: <span class="text-red">${Math.max(0, effVit - 1)} x 4 = ${Math.max(0, effVit - 1) * 4}</span></div><div>Level Contribution: <span class="text-red">${Math.max(0, (p.level || 1) - 1)} x 6 = ${Math.max(0, (p.level || 1) - 1) * 6}</span></div><div>Class Multiplier: <span class="text-red">x${hpMultiplier.toFixed(2)}</span></div><div>Final 3x Scaling: <span class="text-red">${hp}</span></div>`,
+                'stat-combat-armor': `<div class="shop-preview-title">Armor Breakdown</div><div>Equipped Piece Total: <span class="text-shield">${rawArmor}</span></div><div>Class Multiplier: <span class="text-shield">x${armorMultiplier.toFixed(2)}</span></div><div style="margin-top:6px;">Final Armor: <span class="text-shield">${armor}</span></div>`,
+                'stat-combat-dmg': `<div class="shop-preview-title">Melee Damage Breakdown</div><div>Weapon Base: <span class="text-orange">${weaponMin}-${weaponMax}</span>${weapon ? ` <span style="color:#aaa;">(${weapon.name})</span>` : ' <span style="color:#aaa;">(unarmed)</span>'}</div><div>Strength Bonus: <span class="text-orange">+${strDamageBonus}</span> to min and max</div><div style="margin-top:6px;">Final Damage: <span class="text-orange">${dmg.min}-${dmg.max}</span></div>`,
+                'stat-combat-regen': `<div class="shop-preview-title">Regeneration Formula</div><div>Effective Vitality: <span class="text-green">${effVit}</span></div><div>Formula: <span class="text-green">floor(VIT / 2)</span></div><div style="margin-top:6px;">Regen Per Turn: <span class="text-green">${regen}</span></div>`
+            };
+            if (previewBox && previewBody && typeof movePreview === 'function') {
+                Object.keys(hoverMap).forEach(id => {
+                    const el = $(id);
+                    if (!el) return;
+                    el.onmouseenter = (ev) => {
+                        previewBody.innerHTML = hoverMap[id];
+                        if (previewIcon) {
+                            previewIcon.src = '';
+                            previewIcon.classList.add('hidden');
+                        }
+                        movePreview(ev);
+                        previewBox.classList.remove('hidden');
+                        previewBox.classList.add('visible');
+                    };
+                    el.onmousemove = (ev) => {
+                        if (previewBox.classList.contains('visible')) movePreview(ev);
+                    };
+                    el.onmouseleave = () => {
+                        previewBox.classList.remove('visible');
+                    };
+                });
+            }
+        }
         const m = $('modal-stats');
         if (!m) return;
         m.classList.remove('hidden');
@@ -2160,31 +2470,88 @@ const game = {
     },
     openArmorPanel() {
         if (!this.player) return;
+        this.ensurePreviewHelpers();
         const m = $('modal-armor');
         if (!m) return;
         m.classList.remove('hidden');
         const listEl = $('armor-list');
         const summaryEl = $('armor-summary');
         const totalEl = $('armor-total');
+        const previewBox = $('shop-preview');
+        const buildPreviewFromItem = this._buildItemPreview;
+        const movePreview = this._moveItemPreview;
         if (!listEl) return;
         const p = this.player;
         let equippedCount = 0;
         let totalArmor = 0;
         const rows = [];
+        const armorIcons = {
+            head: 'assets/images/armor-icons/head_icon.png',
+            neck: 'assets/images/armor-icons/neck_icon.png',
+            shoulders: 'assets/images/armor-icons/shoulder_icon.png',
+            chest: 'assets/images/armor-icons/chest_icon.png',
+            arms: 'assets/images/armor-icons/arms_icon.png',
+            shield: 'assets/images/armor-icons/shield_icon.png',
+            thighs: 'assets/images/armor-icons/thighs_icon.png',
+            shins: 'assets/images/armor-icons/shins_icon.png'
+        };
         ARMOR_SLOTS.forEach(slot => {
             const item = p.gear[slot];
             const label = slot.charAt(0).toUpperCase() + slot.slice(1);
+            const icon = armorIcons[slot] || '';
             if (item) {
                 const val = (typeof item.val === 'number') ? item.val : 0;
                 if (val > 0) totalArmor += val;
                 equippedCount++;
-                const valText = val ? ` <span style="color:#888; font-size:0.8rem;">(+${val})</span>` : '';
-                rows.push(`<div class="stat-row"><span>${label}</span><span><span class="${item.rarity}">${item.name}</span>${valText}</span></div>`);
+                const valText = val ? `<span class="armor-piece-value">+${val}</span>` : '';
+                rows.push(`
+                    <div class="armor-row armor-row-filled">
+                        <div class="armor-slot-cell">
+                            <span class="armor-slot-icon-wrap">${icon ? `<img class="armor-slot-icon" src="${icon}" alt="${label}" />` : ''}</span>
+                            <span class="armor-slot-name">${label}</span>
+                        </div>
+                        <div class="armor-piece-cell">
+                            <span>
+                                <span class="${item.rarity} armor-panel-item" data-armor-slot="${slot}">${item.name}</span>
+                                ${valText}
+                            </span>
+                        </div>
+                    </div>
+                `);
             } else {
-                rows.push(`<div class="stat-row"><span>${label}</span><span style="color:#555;">Empty</span></div>`);
+                rows.push(`
+                    <div class="armor-row armor-row-empty">
+                        <div class="armor-slot-cell">
+                            <span class="armor-slot-icon-wrap">${icon ? `<img class="armor-slot-icon armor-slot-icon-empty" src="${icon}" alt="${label}" />` : ''}</span>
+                            <span class="armor-slot-name">${label}</span>
+                        </div>
+                        <div class="armor-piece-cell">
+                            <span class="armor-empty-pill">Empty</span>
+                        </div>
+                    </div>
+                `);
             }
         });
         listEl.innerHTML = rows.join('');
+        if (previewBox && typeof buildPreviewFromItem === 'function' && typeof movePreview === 'function') {
+            ARMOR_SLOTS.forEach(slot => {
+                const item = p.gear[slot];
+                const el = listEl.querySelector(`[data-armor-slot="${slot}"]`);
+                if (!item || !el) return;
+                el.onmouseenter = (ev) => {
+                    buildPreviewFromItem(item);
+                    movePreview(ev);
+                    previewBox.classList.remove('hidden');
+                    previewBox.classList.add('visible');
+                };
+                el.onmousemove = (ev) => {
+                    if (previewBox.classList.contains('visible')) movePreview(ev);
+                };
+                el.onmouseleave = () => {
+                    previewBox.classList.remove('visible');
+                };
+            });
+        }
         if (summaryEl) {
             summaryEl.innerText = `Equipped armor pieces: ${equippedCount}/${ARMOR_SLOTS.length}`;
         }
@@ -2200,13 +2567,55 @@ const game = {
     triggerLevelUp() { this.player.pts = 3; this.tempStats = {...this.player.stats}; $('modal-levelup').classList.remove('hidden'); this.renderLvlUI(); },
     renderLvlUI() { 
         const c = $('stat-allocator'); c.innerHTML=''; 
+        const labels = {
+            str: 'Strength',
+            atk: 'Attack',
+            def: 'Defence',
+            vit: 'Vitality',
+            mag: 'Magicka',
+            chr: 'Charisma'
+        };
+        const effects = {
+            str: ['+ Weapon Damage', '+ Melee Scaling'],
+            atk: ['+ Hit Chance', '+ Crit Chance'],
+            def: ['- Enemy Accuracy', '+ Survivability'],
+            vit: ['+ Max Health', '+ Regen / Turn'],
+            mag: ['+ Future Magic Power', '+ Ability Scaling'],
+            chr: ['+ Gold Rewards', '+ XP Rewards']
+        };
+        const valueClasses = {
+            str: 'text-orange',
+            atk: 'text-red',
+            def: 'text-blue',
+            vit: 'text-green',
+            mag: 'text-purple',
+            chr: 'text-gold'
+        };
         ['str','atk','def','vit','mag','chr'].forEach(k=>{ 
-            const d=document.createElement('div'); d.style.display='flex'; d.style.justifyContent='space-between'; d.style.marginBottom='10px';
-            d.innerHTML=`<span>${k.toUpperCase()} <span class="text-blue">${this.tempStats[k]}</span></span><div><button class="btn" onclick="game.modStat('${k}',-1)">-</button><button class="btn" onclick="game.modStat('${k}',1)">+</button></div>`; c.appendChild(d);
-        // ... (rest of the code remains the same)
+            const d=document.createElement('div');
+            d.className = 'levelup-stat-row';
+            const canDown = this.tempStats[k] > this.player.stats[k];
+            const canUp = this.player.pts > 0;
+            d.innerHTML = `
+                <div class="levelup-stat-meta">
+                    <div class="levelup-stat-code">${k.toUpperCase()}</div>
+                    <div class="levelup-stat-label">${labels[k]}</div>
+                </div>
+                <div class="levelup-stat-effects">
+                    <div>${effects[k][0]}</div>
+                    <div>${effects[k][1]}</div>
+                </div>
+                <div class="levelup-stat-controls">
+                    <button class="btn levelup-step-btn" ${canDown ? '' : 'disabled'} onclick="game.modStat('${k}',-1)">-</button>
+                    <div class="levelup-stat-value ${valueClasses[k]}">${this.tempStats[k]}</div>
+                    <button class="btn levelup-step-btn" ${canUp ? '' : 'disabled'} onclick="game.modStat('${k}',1)">+</button>
+                </div>
+            `;
+            c.appendChild(d);
         }); 
         $('lvl-pts').innerText = this.player.pts; 
-        const btn=$('btn-lvl-confirm'); btn.disabled = (this.player.pts !== 0); btn.style.background=(this.player.pts===0)?'var(--accent-green)':'#222';
+        const btn=$('btn-lvl-confirm');
+        btn.disabled = (this.player.pts !== 0);
     },
     modStat(k,v) { if(v>0 && this.player.pts>0){this.tempStats[k]++; this.player.pts--;} else if(v<0 && this.tempStats[k]>this.player.stats[k]){this.tempStats[k]--; this.player.pts++;} this.renderLvlUI(); },
     confirmLevelUp() { this.player.stats={...this.tempStats}; $('modal-levelup').classList.add('hidden'); this.saveGame(); this.showHub(); },
@@ -2371,11 +2780,160 @@ const blackjack = {
 // --- COMBAT ENGINE ---
 const combat = {
     hp: 0, maxHp: 0, armor: 0, maxArmor: 0, enemy: null, turn: 'player', actionLock: false,
+    enemies: [], activeEnemyIndex: 0,
+    targetSelectionActive: false, pendingAttackType: null,
     enemyActing: false, // guard to prevent overlapping enemy turns
     playerDots: [], // active DOT effects on player
     dotResist: {},  // per-combat resistance per DOT id (0-1)
     log: [],        // recent combat log lines
     potionSlots: [null, null, null], // active potions brought into this fight
+    _lagTimers: {},
+    _lastBarPct: {},
+    mode: 'duel',
+    getLivingEnemies() {
+        return Array.isArray(this.enemies) ? this.enemies.filter(e => e && e.hp > 0) : [];
+    },
+    syncActiveEnemy() {
+        if (!Array.isArray(this.enemies) || this.enemies.length === 0) {
+            this.enemy = null;
+            this.activeEnemyIndex = 0;
+            return null;
+        }
+        const current = this.enemies[this.activeEnemyIndex];
+        if (!current || current.hp <= 0) {
+            const nextIdx = this.enemies.findIndex(e => e && e.hp > 0);
+            this.activeEnemyIndex = nextIdx === -1 ? 0 : nextIdx;
+        }
+        this.enemy = this.enemies[this.activeEnemyIndex] || this.enemies[0] || null;
+        return this.enemy;
+    },
+    setActiveEnemy(index = 0) {
+        if (!Array.isArray(this.enemies) || !this.enemies[index] || this.enemies[index].hp <= 0) return;
+        this.activeEnemyIndex = index;
+        this.syncActiveEnemy();
+        this.updateEnemyTargetUI();
+        if (this.targetSelectionActive && this.turn === 'player' && this.pendingAttackType) {
+            const pending = this.pendingAttackType;
+            this.targetSelectionActive = false;
+            this.pendingAttackType = null;
+            this.playerAttack(pending, index);
+        }
+    },
+    updateEnemyTargetUI() {
+        const avatar1 = document.querySelector('.combat-avatar-enemy:not(.combat-avatar-enemy-2)');
+        const avatar2 = $('combat-avatar-enemy-2');
+        const unit1 = document.querySelector('.enemy-unit:not(.enemy-unit-2)');
+        const unit2 = $('enemy-unit-2');
+        const btn1 = $('enemy-target-btn-1');
+        const btn2 = $('enemy-target-btn-2');
+        const prompt = $('combat-target-prompt');
+        [avatar1, avatar2, unit1, unit2].forEach(el => el && el.classList.remove('is-targeted'));
+        if (this.activeEnemyIndex === 0) {
+            if (avatar1) avatar1.classList.add('is-targeted');
+            if (unit1) unit1.classList.add('is-targeted');
+        } else {
+            if (avatar2) avatar2.classList.add('is-targeted');
+            if (unit2) unit2.classList.add('is-targeted');
+        }
+        [avatar1, avatar2, unit1, unit2].forEach(el => el && el.classList.toggle('is-selecting-target', this.targetSelectionActive));
+        if (btn1) {
+            const show1 = this.mode === 'duo' && this.targetSelectionActive && !!(this.enemies[0] && this.enemies[0].hp > 0);
+            btn1.classList.toggle('hidden', !show1);
+            btn1.classList.toggle('is-active', show1 && this.activeEnemyIndex === 0);
+        }
+        if (btn2) {
+            const show2 = this.mode === 'duo' && this.targetSelectionActive && !!(this.enemies[1] && this.enemies[1].hp > 0);
+            btn2.classList.toggle('hidden', !show2);
+            btn2.classList.toggle('is-active', show2 && this.activeEnemyIndex === 1);
+        }
+        if (prompt) prompt.classList.toggle('hidden', !(this.mode === 'duo' && this.targetSelectionActive));
+    },
+    buildEnemyCombatant(enemyGen, mode) {
+        const p = game.player;
+        const tpl = enemyGen ? enemyGen.template : null;
+        const eStats = enemyGen ? enemyGen.stats : { str: 5, atk: 5, def: 3, vit: 3 };
+        const s = enemyGen ? enemyGen.level : p.level;
+        const enemyName = tpl ? tpl.name : 'Bandit';
+        const enemy = {
+            name: enemyName,
+            templateKey: tpl && tpl.key ? tpl.key : String(enemyName || '').toLowerCase(),
+            lvl: s,
+            maxHp: 0,
+            hp: 0,
+            str: eStats.str,
+            atk: eStats.atk,
+            def: eStats.def,
+            vit: eStats.vit,
+            mag: 0,
+            armor: 0,
+            maxArmor: 0
+        };
+        let desiredClass = (tpl && tpl.weaponClass) ? tpl.weaponClass : 'Sword';
+        let enemyWeapon = null;
+        if (typeof WEAPONS !== 'undefined') {
+            const minCap = Math.max(1, s - 5);
+            const levelCap = rng(minCap, s);
+            let pool = WEAPONS.filter(w => {
+                const cls = (w.weaponClass || w.baseType || '').toLowerCase();
+                const want = desiredClass.toLowerCase();
+                const lvlReq = (typeof w.minShopLevel === 'number') ? w.minShopLevel : 1;
+                return cls.includes(want) && lvlReq <= levelCap;
+            });
+            if (pool.length === 0) {
+                pool = WEAPONS.filter(w => {
+                    const lvlReq = (typeof w.minShopLevel === 'number') ? w.minShopLevel : 1;
+                    return lvlReq <= levelCap;
+                });
+            }
+            if (pool.length > 0) {
+                const tplWeapon = pool[rng(0, pool.length - 1)];
+                enemyWeapon = { ...tplWeapon };
+                const scale = 0.8;
+                if (typeof enemyWeapon.min === 'number') enemyWeapon.min = Math.max(1, Math.floor(enemyWeapon.min * scale));
+                if (typeof enemyWeapon.max === 'number') enemyWeapon.max = Math.max(enemyWeapon.min, Math.floor(enemyWeapon.max * scale));
+            }
+        }
+        if (!enemyWeapon) {
+            const base = Math.floor(enemy.str * 1.2);
+            const weaponMin = Math.max(3, base - 4);
+            const weaponMax = base + 4;
+            let iconPath = '';
+            const clsLower = desiredClass.toLowerCase();
+            if (clsLower === 'axe') iconPath = 'assets/weapon-icons/axe_icon.png';
+            else if (clsLower === 'sword') iconPath = 'assets/weapon-icons/sword_icon.png';
+            else if (clsLower === 'hammer') iconPath = 'assets/weapon-icons/hammer_icon.png';
+            else if (clsLower === 'dagger') iconPath = 'assets/weapon-icons/dagger_icon.png';
+            else if (clsLower === 'spear') iconPath = 'assets/weapon-icons/spear_icon.png';
+            else if (clsLower === 'bow') iconPath = 'assets/weapon-icons/crossbow_icon.png';
+            enemyWeapon = { min: weaponMin, max: weaponMax, weaponClass: desiredClass, baseType: desiredClass, iconPath };
+        }
+        if (!enemyWeapon.iconPath) {
+            const cls = (enemyWeapon.weaponClass || enemyWeapon.baseType || '').toLowerCase();
+            let iconPath = '';
+            if (cls.includes('axe')) iconPath = 'assets/weapon-icons/axe_icon.png';
+            else if (cls.includes('sword') || cls.includes('blade')) iconPath = 'assets/weapon-icons/sword_icon.png';
+            else if (cls.includes('hammer') || cls.includes('mace')) iconPath = 'assets/weapon-icons/hammer_icon.png';
+            else if (cls.includes('dagger')) iconPath = 'assets/weapon-icons/dagger_icon.png';
+            else if (cls.includes('spear') || cls.includes('halberd') || cls.includes('lance')) iconPath = 'assets/weapon-icons/spear_icon.png';
+            else if (cls.includes('bow') || cls.includes('crossbow')) iconPath = 'assets/weapon-icons/crossbow_icon.png';
+            enemyWeapon.iconPath = iconPath;
+        }
+        enemy.weapon = enemyWeapon;
+        if (enemyWeapon && enemyWeapon.statMods) {
+            const m = enemyWeapon.statMods;
+            if (typeof m.str === 'number') enemy.str += m.str;
+            if (typeof m.atk === 'number') enemy.atk += m.atk;
+            if (typeof m.def === 'number') enemy.def += m.def;
+            if (typeof m.vit === 'number') enemy.vit += m.vit;
+        }
+        enemy.maxHp = this.getEnemyMaxHp(enemy);
+        enemy.hp = enemy.maxHp;
+        const baseArm = mode === 'no_armor' ? 0 : Math.max(0, Math.floor(enemy.def * 1.2 + enemy.vit * 0.8 + s * 2));
+        enemy.maxArmor = baseArm;
+        enemy.armor = baseArm;
+        enemy.avatarKey = (typeof getEnemyAvatarKey === 'function') ? getEnemyAvatarKey(tpl) : (tpl && tpl.avatarKey ? tpl.avatarKey : (enemyName || '').toLowerCase());
+        return enemy;
+    },
     getEnemyMaxHp(e) {
         const vit = e.vit || 0;
         const lvl = e.lvl || 1;
@@ -2403,41 +2961,28 @@ const combat = {
             max: Math.max(1, 4 + strBonus)
         };
     },
-    init() {
+    async init(mode = 'duel') {
+        this.mode = mode || 'duel';
         const p = game.player;
         this.maxHp = p.getMaxHp(); this.hp = this.maxHp;
-        this.maxArmor = p.getTotalArmor(); this.armor = this.maxArmor;
+        this.maxArmor = this.mode === 'no_armor' ? 0 : p.getTotalArmor(); this.armor = this.maxArmor;
         this.playerDots = [];
         this.dotResist = {};
+        this._lagTimers = {};
+        this._lastBarPct = {};
 
-        // Prepare combat potion slots for this fight:
-        // player.potionSlots sadece konfigurasyon tutar; gerçek potlar
-        // her dövüş başında envanterden çekilir ve dövüş sonunda
-        // kullanılmayanlar envantere iade edilir.
+        // Prepare combat potion slots for this fight.
+        // Inventory reservation is handled when assigning slots in inventory.
         this.potionSlots = [null, null, null];
         if (p && Array.isArray(p.potionSlots)) {
-            if (!Array.isArray(p.inventory)) p.inventory = [];
-            const inv = p.inventory;
             this.potionSlots = p.potionSlots.map(slot => {
                 if (!slot) return null;
-                const subType = slot.subType;
-                const percent = slot.percent || 0;
-                const name = slot.name || '';
-                // Envanterden uygun tipi bul ve bu dövüş icin 1 adet tüket
-                const existing = inv.find(it => it && it.type === 'potion' && it.subType === subType && (it.percent || 0) === percent && it.name === name && (it.qty || 0) > 0);
-                if (!existing) {
-                    // Bu dövüş icin stoğun yok, slot boş kalır
-                    return null;
-                }
-                existing.qty = (existing.qty || 0) - 1;
-                if (existing.qty <= 0) {
-                    const idx = inv.indexOf(existing);
-                    if (idx !== -1) inv.splice(idx, 1);
-                }
                 return {
-                    subType,
-                    percent,
-                    name,
+                    subType: slot.subType,
+                    percent: slot.percent || 0,
+                    name: slot.name || '',
+                    rarity: slot.rarity || 'rarity-common',
+                    price: slot.price,
                     used: false
                 };
             });
@@ -2448,32 +2993,36 @@ const combat = {
             dmgEl.innerText = '';
             dmgEl.className = 'dmg-text';
         }
+        const particlesEl = $('combat-impact-particles');
+        if (particlesEl) particlesEl.innerHTML = '';
+        const finisherEl = $('combat-finish-flash');
+        if (finisherEl) finisherEl.className = 'combat-finish-flash';
+        const playerFxEl = $('c-player-avatar-fx');
+        if (playerFxEl) playerFxEl.className = 'combat-avatar-fx combat-avatar-fx-player';
         const logEl = $('combat-log');
         if (logEl) {
             logEl.innerHTML = '';
             logEl.classList.remove('expanded');
         }
-        // Enemy template + stats from enemy_config.js
-        const enemyGen = (typeof generateEnemyTemplateForLevel === 'function')
-            ? generateEnemyTemplateForLevel(p.level)
-            : null;
-        const tpl = enemyGen ? enemyGen.template : null;
-        const eStats = enemyGen ? enemyGen.stats : { str: 5, atk: 5, def: 3, vit: 3 };
-        const s = enemyGen ? enemyGen.level : p.level;
-        const enemyName = tpl ? tpl.name : 'Bandit';
-
         // Combat portraits: player + enemy
         const playerAvatarEl = $('c-player-avatar');
         if (playerAvatarEl) {
             playerAvatarEl.src = PLAYER_AVATAR_IMG;
         }
+        const enemyGen = (typeof generateEnemyTemplateForLevel === 'function') ? generateEnemyTemplateForLevel(p.level) : null;
+        const secondEnemyGen = this.mode === 'duo' && typeof generateEnemyTemplateForLevel === 'function' ? generateEnemyTemplateForLevel(Math.max(1, p.level - 1)) : null;
+        this.enemies = [this.buildEnemyCombatant(enemyGen, this.mode)];
+        if (this.mode === 'duo') this.enemies.push(this.buildEnemyCombatant(secondEnemyGen, this.mode));
+        this.activeEnemyIndex = 0;
+        this.syncActiveEnemy();
         const enemyAvatarEl = $('c-enemy-avatar');
-        if (enemyAvatarEl) {
-            const avatarKey = (typeof getEnemyAvatarKey === 'function')
-                ? getEnemyAvatarKey(tpl)
-                : (tpl && tpl.avatarKey ? tpl.avatarKey : (enemyName || '').toLowerCase());
-            enemyAvatarEl.src = ENEMY_AVATARS[avatarKey] || '';
-        }
+        if (enemyAvatarEl && this.enemies[0]) enemyAvatarEl.src = ENEMY_AVATARS[this.enemies[0].avatarKey] || '';
+        const enemy2AvatarEl = $('c-enemy2-avatar');
+        if (enemy2AvatarEl && this.enemies[1]) enemy2AvatarEl.src = ENEMY_AVATARS[this.enemies[1].avatarKey] || '';
+        const enemy2Wrap = $('combat-avatar-enemy-2');
+        const enemy2Unit = $('enemy-unit-2');
+        if (enemy2Wrap) enemy2Wrap.classList.toggle('hidden', this.mode !== 'duo');
+        if (enemy2Unit) enemy2Unit.classList.toggle('hidden', this.mode !== 'duo');
 
         // Yeni dövüşte enemy death cross efektini sıfırla
         const cross = $('enemy-death-cross');
@@ -2487,112 +3036,31 @@ const combat = {
             pCross.classList.remove('player-death-cross-anim');
             pCross.style.opacity = '0';
         }
-
-        // Temel enemy statları (HP formülü şimdilik eskisi gibi kalsın)
-        this.enemy = {
-            name: enemyName,
-            lvl: s,
-            maxHp: 0,
-            hp: 0,
-            str: eStats.str,
-            atk: eStats.atk,
-            def: eStats.def,
-            vit: eStats.vit,
-            mag: 0,
-            armor: 0,
-            maxArmor: 0
-        };
-
-        // Enemy silahını merkezi WEAPONS kataloğundan seç
-        let desiredClass = (tpl && tpl.weaponClass) ? tpl.weaponClass : 'Sword';
-
-        let enemyWeapon = null;
-        if (typeof WEAPONS !== 'undefined') {
-            // Düşman her zaman kendi level'inin en tepesindeki silahı kullanmasın diye,
-            // level-5 ile level arasında rastgele bir "tavan seviye" seçiyoruz.
-            const minCap = Math.max(1, s - 5);
-            const levelCap = rng(minCap, s);
-
-            let pool = WEAPONS.filter(w => {
-                const cls = (w.weaponClass || w.baseType || '').toLowerCase();
-                const want = desiredClass.toLowerCase();
-                const lvlReq = (typeof w.minShopLevel === 'number') ? w.minShopLevel : 1;
-                return cls.includes(want) && lvlReq <= levelCap;
-            });
-            if (pool.length === 0) {
-                pool = WEAPONS.filter(w => {
-                    const lvlReq = (typeof w.minShopLevel === 'number') ? w.minShopLevel : 1;
-                    return lvlReq <= levelCap;
-                });
-            }
-            if (pool.length > 0) {
-                const tpl = pool[rng(0, pool.length - 1)];
-                enemyWeapon = { ...tpl };
-                // Enemy, player ile aynı silah şablonunu kullanıyor ama biraz zayıflatılmış versiyonuyla
-                const scale = 0.8;
-                if (typeof enemyWeapon.min === 'number') {
-                    enemyWeapon.min = Math.max(1, Math.floor(enemyWeapon.min * scale));
-                }
-                if (typeof enemyWeapon.max === 'number') {
-                    enemyWeapon.max = Math.max(enemyWeapon.min, Math.floor(enemyWeapon.max * scale));
-                }
-            }
+        const cross2 = $('enemy2-death-cross');
+        if (cross2) {
+            cross2.classList.remove('enemy-death-cross-anim');
+            cross2.style.opacity = '0';
         }
 
-        if (!enemyWeapon) {
-            // Fallback: önceki basit STR tabanlı silah hesaplaması
-            const base = Math.floor(this.enemy.str * 1.2);
-            const weaponMin = Math.max(3, base - 4);
-            const weaponMax = base + 4;
-            let weaponClass = desiredClass;
-            let baseType = desiredClass;
-            let iconPath = '';
-            const clsLower = weaponClass.toLowerCase();
-            if (clsLower === 'axe') iconPath = 'assets/weapon-icons/axe_icon.png';
-            else if (clsLower === 'sword') iconPath = 'assets/weapon-icons/sword_icon.png';
-            else if (clsLower === 'hammer') iconPath = 'assets/weapon-icons/hammer_icon.png';
-            else if (clsLower === 'dagger') iconPath = 'assets/weapon-icons/dagger_icon.png';
-            else if (clsLower === 'spear') iconPath = 'assets/weapon-icons/spear_icon.png';
-            else if (clsLower === 'bow') iconPath = 'assets/weapon-icons/crossbow_icon.png';
-            enemyWeapon = { min: weaponMin, max: weaponMax, weaponClass, baseType, iconPath };
+        const gameContainer = $('game-container');
+        if (gameContainer) {
+            gameContainer.classList.add('screen-fade-active');
+            await wait(230);
         }
-
-        // icon path haritası (player silah ikonlarıyla uyumlu) – katalog itemlerinde eksikse buradan doldur
-        if (!enemyWeapon.iconPath) {
-            const cls = (enemyWeapon.weaponClass || enemyWeapon.baseType || '').toLowerCase();
-            let iconPath = '';
-            if (cls.includes('axe')) iconPath = 'assets/weapon-icons/axe_icon.png';
-            else if (cls.includes('sword') || cls.includes('blade')) iconPath = 'assets/weapon-icons/sword_icon.png';
-            else if (cls.includes('hammer') || cls.includes('mace')) iconPath = 'assets/weapon-icons/hammer_icon.png';
-            else if (cls.includes('dagger')) iconPath = 'assets/weapon-icons/dagger_icon.png';
-            else if (cls.includes('spear') || cls.includes('halberd') || cls.includes('lance')) iconPath = 'assets/weapon-icons/spear_icon.png';
-            else if (cls.includes('bow') || cls.includes('crossbow')) iconPath = 'assets/weapon-icons/crossbow_icon.png';
-            enemyWeapon.iconPath = iconPath;
-        }
-
-        this.enemy.weapon = enemyWeapon;
-
-        // Silahın statMods değerlerini enemy statlarına ekle (STR/ATK/DEF/VIT)
-        if (enemyWeapon && enemyWeapon.statMods) {
-            const m = enemyWeapon.statMods;
-            if (typeof m.str === 'number') this.enemy.str += m.str;
-            if (typeof m.atk === 'number') this.enemy.atk += m.atk;
-            if (typeof m.def === 'number') this.enemy.def += m.def;
-            if (typeof m.vit === 'number') this.enemy.vit += m.vit;
-        }
-
-        // Enemy'nin gerçek max HP'sini (silah buff'lı VIT + level'e göre) ayarla
-        this.enemy.maxHp = this.getEnemyMaxHp(this.enemy);
-        this.enemy.hp = this.enemy.maxHp;
-
-        // Enemy armor: level ve DEF/VIT'e göre basit bir değer
-        const baseArm = Math.max(0, Math.floor(this.enemy.def * 1.2 + this.enemy.vit * 0.8 + s * 2));
-        this.enemy.maxArmor = baseArm;
-        this.enemy.armor = baseArm;
         if (typeof playFightMusic === 'function') playFightMusic();
         $('screen-hub').classList.add('hidden'); $('screen-combat').classList.remove('hidden'); $('enemy-think').style.display='none';
+        if (gameContainer) {
+            await wait(40);
+            gameContainer.classList.remove('screen-fade-active');
+        }
+        if (this.mode === 'no_armor') {
+            this.logMessage('No Armor rules are active. Both fighters enter unguarded.');
+        } else if (this.mode === 'duo') {
+            this.logMessage('1v2 rules are active. Two enemies stand against you.');
+        }
         this.log = [];
-        this.logMessage(`${this.enemy.name} enters the arena!`);
+        if (this.mode === 'duo' && this.enemies[1]) this.logMessage(`${this.enemies[0].name} and ${this.enemies[1].name} enter the arena!`);
+        else this.logMessage(`${this.enemy.name} enters the arena!`);
         this.updateUI();
         // Yazı-tura: her arenada ilk saldıran taraf rastgele belirlensin, sonucu mor log ile göster
         const firstIsPlayer = Math.random() < 0.5;
@@ -2604,9 +3072,15 @@ const combat = {
             this.setTurn(firstIsPlayer ? 'player' : 'enemy');
         }, 1500);
     },
-    inspectEnemy() {
+    inspectEnemy(index = null) {
+        if (this.targetSelectionActive && typeof index === 'number') {
+            this.setActiveEnemy(index);
+            return;
+        }
         $('modal-inspect').classList.remove('hidden');
-        const e = this.enemy;
+        if (typeof index === 'number') this.setActiveEnemy(index);
+        const e = this.syncActiveEnemy();
+        if (!e) return;
         $('ins-name').innerText = e.name;
         $('ins-lvl').innerText = e.lvl;
         $('ins-str').innerText = e.str;
@@ -2949,51 +3423,57 @@ const combat = {
     },
     returnUnusedPotions() {
         if (!game.player || !Array.isArray(this.potionSlots)) return;
-        const p = game.player;
-        if (!Array.isArray(p.inventory)) p.inventory = [];
-        const inv = p.inventory;
         this.potionSlots.forEach((slot) => {
             if (!slot) return;
-            const subType = slot.subType;
-            const percent = slot.percent || 0;
-            const name = slot.name || '';
-
-            // Sadece KULLANILMAYAN slotları envantere iade et
             if (!slot.used) {
-                const existing = inv.find(it => it && it.type === 'potion' && it.subType === subType && (it.percent || 0) === percent && it.name === name);
-                if (existing) {
-                    existing.qty = (existing.qty || 1) + 1;
-                } else {
-                    inv.push({
-                        id: Date.now() + Math.random(),
-                        type: 'potion',
-                        subType,
-                        percent,
-                        name,
-                        qty: 1,
-                        rarity: 'rarity-common'
-                    });
-                }
+                game.addPotionToInventory(slot, 1);
             }
         });
-
-        // Combat state için slotları sıfırla; player.potionSlots konfigurasyonu korunur
+        if (game.player && Array.isArray(game.player.potionSlots)) {
+            game.player.potionSlots = game.player.potionSlots.map(slot => slot ? { ...slot, used: false } : null);
+        }
         this.potionSlots = [null, null, null];
     },
     updateUI() {
-        const e = this.enemy;
-        $('c-enemy-name').innerText = e.name; $('c-enemy-lvl').innerText = `Lvl ${e.lvl}`;
-        $('c-enemy-hp').style.width = (e.hp/e.maxHp)*100 + '%'; $('c-enemy-hp-text').innerText = `${Math.max(0,e.hp)}/${e.maxHp}`;
-        const enemyArmPct = e.maxArmor > 0 ? (e.armor / e.maxArmor) * 100 : 0;
-        $('c-enemy-arm').style.width = enemyArmPct + '%'; $('c-enemy-arm-text').innerText = `${Math.max(0, e.armor)}/${e.maxArmor}`;
+        this.syncActiveEnemy();
+        const e1 = this.enemies[0] || this.enemy;
+        if (!e1) return;
+        if (!this.targetSelectionActive) this.pendingAttackType = null;
+        $('c-enemy-name').innerText = e1.name; $('c-enemy-lvl').innerText = `Lvl ${e1.lvl}`;
+        const enemyHpPct = e1.maxHp > 0 ? (e1.hp / e1.maxHp) * 100 : 0;
+        this.updateLagBar('c-enemy-hp', 'c-enemy-hp-lag', enemyHpPct);
+        $('c-enemy-hp-text').innerText = `${Math.max(0,e1.hp)}/${e1.maxHp}`;
+        const enemyArmPct = e1.maxArmor > 0 ? (e1.armor / e1.maxArmor) * 100 : 0;
+        this.updateLagBar('c-enemy-arm', 'c-enemy-arm-lag', enemyArmPct);
+        $('c-enemy-arm-text').innerText = `${Math.max(0, e1.armor)}/${e1.maxArmor}`;
+        const e2 = this.enemies[1];
+        const enemy2Wrap = $('combat-avatar-enemy-2');
+        const enemy2Unit = $('enemy-unit-2');
+        if (enemy2Wrap) enemy2Wrap.classList.toggle('hidden', !(this.mode === 'duo' && e2));
+        if (enemy2Unit) enemy2Unit.classList.toggle('hidden', !(this.mode === 'duo' && e2));
+        if (this.mode === 'duo' && e2) {
+            $('c-enemy2-name').innerText = e2.name;
+            $('c-enemy2-lvl').innerText = `Lvl ${e2.lvl}`;
+            this.updateLagBar('c-enemy2-hp', 'c-enemy2-hp-lag', e2.maxHp > 0 ? (e2.hp / e2.maxHp) * 100 : 0);
+            $('c-enemy2-hp-text').innerText = `${Math.max(0,e2.hp)}/${e2.maxHp}`;
+            this.updateLagBar('c-enemy2-arm', 'c-enemy2-arm-lag', e2.maxArmor > 0 ? (e2.armor / e2.maxArmor) * 100 : 0);
+            $('c-enemy2-arm-text').innerText = `${Math.max(0,e2.armor)}/${e2.maxArmor}`;
+            const enemy2Avatar = $('c-enemy2-avatar');
+            if (enemy2Avatar && !enemy2Avatar.src) enemy2Avatar.src = ENEMY_AVATARS[e2.avatarKey] || '';
+            const enemy2Cross = $('enemy2-death-cross');
+            if (enemy2Cross && e2.hp <= 0) enemy2Cross.classList.add('enemy-death-cross-anim');
+        }
         const p = game.player;
         const nameEl = $('c-player-name-text');
         const lvlEl = $('c-player-lvl');
         if (nameEl) nameEl.innerText = p.name;
         if (lvlEl) lvlEl.innerText = `Lvl ${p.level || 1}`;
-        $('c-player-hp').style.width = (this.hp/this.maxHp)*100 + '%'; $('c-player-hp-text').innerText = `${Math.max(0,this.hp)}/${this.maxHp}`;
+        const playerHpPct = this.maxHp > 0 ? (this.hp / this.maxHp) * 100 : 0;
+        this.updateLagBar('c-player-hp', 'c-player-hp-lag', playerHpPct);
+        $('c-player-hp-text').innerText = `${Math.max(0,this.hp)}/${this.maxHp}`;
         const armPct = this.maxArmor > 0 ? (this.armor/this.maxArmor)*100 : 0;
-        $('c-player-arm').style.width = armPct + '%'; $('c-player-arm-text').innerText = `${Math.max(0,this.armor)}/${this.maxArmor}`;
+        this.updateLagBar('c-player-arm', 'c-player-arm-lag', armPct);
+        $('c-player-arm-text').innerText = `${Math.max(0,this.armor)}/${this.maxArmor}`;
         // render status icons for active DOTs
         const iconContainer = $('status-icons');
         if(iconContainer) {
@@ -3027,14 +3507,16 @@ const combat = {
                 resistCont.innerHTML = parts;
             }
         }
+        this.refreshAvatarFx();
 
         if(this.turn === 'player') {
-            const hit = this.calcHit(game.player.stats.atk, e.def);
-            const q = Math.max(5, Math.min(99, hit + 15));
+            const hit = this.calcHit(game.player.getEffectiveAtk(), e1.def);
+            const q = Math.max(5, Math.min(99, hit + 18));
             const n = Math.max(5, Math.min(99, hit));
-            const p = Math.max(5, Math.min(99, hit - 20));
+            const p = Math.max(5, Math.min(99, hit - 12));
             $('hit-quick').innerText = q + "%"; $('hit-normal').innerText = n + "%"; $('hit-power').innerText = p + "%";
         }
+        this.updateEnemyTargetUI();
     },
     logMessage(msg) {
         if(!this.log) this.log = [];
@@ -3097,6 +3579,45 @@ const combat = {
         const base = 55 + (atk - def) * 5;
         return Math.max(5, Math.min(99, base));
     },
+    getPlayerAttackProfile(type) {
+        if (type === 'quick') {
+            return { hitBonus: 18, damageMult: 0.82, shake: 'shake-sm', blur: 'combat-blur-sm', impactDuration: 260, hitStopMs: 40, particleColor: 'rgba(180,220,255,0.95)', slashColor: 'rgba(255,255,255,0.95)', impactSize: 180 };
+        }
+        if (type === 'power') {
+            return { hitBonus: -12, damageMult: 1.35, shake: 'shake-lg', blur: 'combat-blur-lg', impactDuration: 500, hitStopMs: 90, particleColor: 'rgba(255,138,101,0.95)', slashColor: 'rgba(255,214,140,0.95)', impactSize: 300 };
+        }
+        return { hitBonus: 0, damageMult: 1, shake: 'shake-md', blur: 'combat-blur-md', impactDuration: 380, hitStopMs: 58, particleColor: 'rgba(255,236,179,0.95)', slashColor: 'rgba(255,255,255,0.9)', impactSize: 230 };
+    },
+    getEnemyDotEffects() {
+        if (typeof STATUS_EFFECTS_CONFIG === 'undefined' || !this.enemy) return [];
+        const key = String(this.enemy.templateKey || this.enemy.name || '').trim().toLowerCase();
+        if (!key) return [];
+        const effects = STATUS_EFFECTS_CONFIG.enemies[key];
+        return Array.isArray(effects) ? effects : [];
+    },
+    applyEnemyOnHitEffects() {
+        const effects = this.getEnemyDotEffects();
+        if (!effects.length || this.hp <= 0) return;
+        effects.forEach(entry => {
+            if (!entry || !entry.effect) return;
+            const resist = this.dotResist[entry.effect] || 0;
+            const finalChance = Math.max(0, (entry.chance || 0) * (1 - resist));
+            if ((rng(0, 100) / 100) > finalChance) return;
+            const alreadyHadEffect = !!(this.playerDots && this.playerDots.some(dot => dot.id === entry.effect));
+            this.applyDot(entry.effect);
+            const cfg = STATUS_EFFECTS_CONFIG.effects[entry.effect];
+            const label = cfg ? cfg.label : entry.effect;
+            const icon = cfg ? cfg.icon : '!';
+            if (alreadyHadEffect) {
+                this.logMessage(`${this.enemy.name} refreshes <span class="log-status">${label}</span> on you.`);
+                this.showCombatToast(`${icon} ${label} refreshed`, 'status', entry.effect);
+            } else {
+                this.logMessage(`${this.enemy.name} inflicts <span class="log-status">${label}</span> on you.`);
+                this.showCombatToast(`${icon} ${label}`, 'status', entry.effect);
+            }
+            this.burstAvatarFx(entry.effect);
+        });
+    },
     setTurn(who) {
         this.turn = who; const ind = $('turn-indicator'); const acts = $('combat-actions');
         if(who === 'player') {
@@ -3129,15 +3650,16 @@ const combat = {
             ind.innerText = "ENEMY TURN"; ind.className = "text-red"; acts.style.opacity = '0.5'; acts.style.pointerEvents = 'none';
 
             // Düşman turu başında, Vitality statına göre can yenilesin
-            const e = this.enemy;
-            if (e && e.hp > 0 && e.hp < e.maxHp && typeof e.vit === 'number') {
-                const enemyRegen = Math.floor(e.vit / 2);
-                if (enemyRegen > 0) {
-                    e.hp = Math.min(e.maxHp, e.hp + enemyRegen);
-                    this.logMessage(`${e.name} regenerates <span class="log-heal">${enemyRegen}</span> HP.`);
-                    this.updateUI();
+            this.getLivingEnemies().forEach(e => {
+                if (e && e.hp > 0 && e.hp < e.maxHp && typeof e.vit === 'number') {
+                    const enemyRegen = Math.floor(e.vit / 2);
+                    if (enemyRegen > 0) {
+                        e.hp = Math.min(e.maxHp, e.hp + enemyRegen);
+                        this.logMessage(`${e.name} regenerates <span class="log-heal">${enemyRegen}</span> HP.`);
+                    }
                 }
-            }
+            });
+            this.updateUI();
 
             // İleride düşmana DOT eklendiğinde burada da benzer şekilde DOT önce, aksiyon sonra çözülebilir
             this.runEnemyTurn();
@@ -3188,6 +3710,13 @@ const combat = {
             // Aktif DOT tiplerine göre renkli vignette göster
             this.flashDotVignette({ hasPoison, hasBurn, hasBleed });
             this.showDmg(totalDmg, 'player', 'dot');
+            this.spawnImpactParticles({
+                x: this.getImpactPoint().x - 220,
+                y: this.getImpactPoint().y + 120,
+                particleColor: hasBurn ? 'rgba(255,145,0,0.92)' : (hasPoison ? 'rgba(118,255,3,0.92)' : 'rgba(255,82,82,0.92)'),
+                slashCount: 0,
+                particleCount: 5
+            });
             this.logMessage(`Damage over time effects deal <span class="log-dmg">${totalDmg}</span> damage to you.`);
             // DOT'tan ölme durumu: HP barı sıfırlandığı anda death cross + gecikmeli defeat ekranı
             if(this.hp <= 0) {
@@ -3240,334 +3769,396 @@ const combat = {
             if(hpDmg > 0) playSfx('hpHit');
         }
     },
-    async playCollisionAnimation(type, result) {
+    triggerHitImpact(shakeClass = 'shake-sm', blurClass = 'combat-blur-sm', duration = 400) {
+        const options = arguments[3] || {};
+        const c = $('game-container');
+        if (!c) return;
+        const impactPoint = this.getImpactPoint();
+        c.style.setProperty('--impact-x', `${impactPoint.x}px`);
+        c.style.setProperty('--impact-y', `${impactPoint.y}px`);
+        c.style.setProperty('--impact-size', `${options.impactSize || 220}px`);
+        c.style.setProperty('--impact-core', options.impactCore || 'rgba(200,0,0,0.95)');
+        c.style.setProperty('--impact-mid', options.impactMid || 'rgba(150,0,0,0.9)');
+        c.style.setProperty('--impact-glow', options.impactGlow || 'rgba(120,0,0,0.9)');
+        c.style.setProperty('--impact-duration', `${options.impactAnimMs || 260}ms`);
+        c.classList.remove('shake-sm', 'shake-md', 'shake-lg', 'hit-impact');
+        const combatScreen = $('screen-combat');
+        if (combatScreen) combatScreen.classList.remove('combat-blur-sm', 'combat-blur-md', 'combat-blur-lg');
+        void c.offsetWidth;
+        if (options.hitStopMs) this.triggerHitStop(options.hitStopMs);
+        c.classList.add(shakeClass);
+        c.classList.add('hit-impact');
+        if (combatScreen && blurClass) combatScreen.classList.add(blurClass);
+        this.spawnImpactParticles({
+            x: impactPoint.x,
+            y: impactPoint.y,
+            particleColor: options.particleColor,
+            slashColor: options.slashColor,
+            particleCount: options.particleCount,
+            slashCount: options.slashCount
+        });
+        setTimeout(() => {
+            c.classList.remove(shakeClass);
+            c.classList.remove('hit-impact');
+            if (combatScreen && blurClass) combatScreen.classList.remove(blurClass);
+        }, duration);
+    },
+    triggerHitStop(ms = 50) {
+        const screen = $('screen-combat');
+        if (!screen) return;
+        screen.classList.remove('hit-stop');
+        void screen.offsetWidth;
+        screen.classList.add('hit-stop');
+        setTimeout(() => {
+            screen.classList.remove('hit-stop');
+        }, ms);
+    },
+    getImpactPoint() {
+        const container = $('game-container');
         const playerWrap = document.querySelector('.combat-avatar-player');
-        const enemyWrap = document.querySelector('.combat-avatar-enemy');
-        if (!playerWrap || !enemyWrap) {
-            if (result && typeof result.apply === 'function') result.apply();
-            return;
+        const enemyWrap = this.activeEnemyIndex === 1 ? $('combat-avatar-enemy-2') : document.querySelector('.combat-avatar-enemy:not(.combat-avatar-enemy-2)');
+        if (!container || !playerWrap || !enemyWrap) {
+            return { x: 640, y: 360 };
         }
-        const origPlayerTransition = playerWrap.style.transition;
-        const origEnemyTransition = enemyWrap.style.transition;
-        playerWrap.style.transition = 'transform 0.18s ease-out';
-        enemyWrap.style.transition = 'transform 0.18s ease-out';
-
+        const contRect = container.getBoundingClientRect();
         const pRect = playerWrap.getBoundingClientRect();
         const eRect = enemyWrap.getBoundingClientRect();
-        const pCenterY = pRect.top + pRect.height / 2;
-        const eCenterY = eRect.top + eRect.height / 2;
-        const midY = (pCenterY + eCenterY) / 2;
-        const pOffsetY = midY - pCenterY;
-        const eOffsetY = midY - eCenterY;
-
-        let pOffsetX = 0;
-        let eOffsetX = 0;
-
-        // 1) Y ekseninde hizalanma
-        playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY}px)`;
-        enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY}px)`;
-        await wait(200);
-
-        // 2) X ekseninde çarpışma: aradaki mesafeyi oranlara böl (attacker daha çok ilerler)
-        const pRect2 = playerWrap.getBoundingClientRect();
-        const eRect2 = enemyWrap.getBoundingClientRect();
-        const pCenterX = pRect2.left + pRect2.width / 2;
-        const eCenterX = eRect2.left + eRect2.width / 2;
-        const distX = eCenterX - pCenterX;
-        const attackerFrac = 0.8;
-        const defenderFrac = 0.3;
-        let playerMoveX = 0;
-        let enemyMoveX = 0;
-        if (type === 'enemy') {
-            enemyMoveX = -attackerFrac * distX;
-            playerMoveX =  defenderFrac * distX;
-        } else {
-            playerMoveX =  attackerFrac * distX;
-            enemyMoveX = -defenderFrac * distX;
+        const x = ((pRect.left + pRect.width / 2) + (eRect.left + eRect.width / 2)) / 2 - contRect.left;
+        const y = ((pRect.top + pRect.height / 2) + (eRect.top + eRect.height / 2)) / 2 - contRect.top;
+        return { x, y };
+    },
+    spawnImpactParticles({ x, y, particleColor, slashColor, particleCount = 7, slashCount = 2 } = {}) {
+        const host = $('combat-impact-particles');
+        if (!host) return;
+        const total = particleCount + slashCount;
+        for (let i = 0; i < total; i++) {
+            const node = document.createElement('span');
+            const isSlash = i >= particleCount;
+            node.className = `impact-particle${isSlash ? ' slash' : ''}`;
+            node.style.setProperty('--px', `${x || 0}px`);
+            node.style.setProperty('--py', `${y || 0}px`);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = isSlash ? 70 + Math.random() * 70 : 32 + Math.random() * 90;
+            node.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+            node.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+            node.style.setProperty('--pcolor', isSlash ? (slashColor || 'rgba(255,255,255,0.9)') : (particleColor || 'rgba(255,160,160,0.88)'));
+            if (isSlash) node.style.transform = `rotate(${Math.round(angle * 57.2958)}deg)`;
+            host.appendChild(node);
+            setTimeout(() => node.remove(), 700);
         }
-        pOffsetX += playerMoveX;
-        eOffsetX += enemyMoveX;
-        playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY}px)`;
-        enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY}px)`;
+    },
+    flashFinisher(kind = 'kill') {
+        const flash = $('combat-finish-flash');
+        if (!flash) return;
+        flash.className = 'combat-finish-flash';
+        flash.classList.add('show');
+        if (kind) flash.dataset.kind = kind;
+        setTimeout(() => {
+            flash.className = 'combat-finish-flash';
+        }, 540);
+    },
+    updateLagBar(fillId, lagId, pct, { immediate = false } = {}) {
+        const fill = $(fillId);
+        const lag = $(lagId);
+        if (!fill || !lag) return;
+        const safePct = Math.max(0, Math.min(100, pct));
+        const prevPct = (typeof this._lastBarPct[lagId] === 'number') ? this._lastBarPct[lagId] : safePct;
+        fill.style.width = safePct + '%';
+        if (immediate || safePct >= prevPct) {
+            lag.style.width = safePct + '%';
+        } else {
+            lag.style.width = prevPct + '%';
+            clearTimeout(this._lagTimers[lagId]);
+            this._lagTimers[lagId] = setTimeout(() => {
+                lag.style.width = safePct + '%';
+            }, 120);
+        }
+        this._lastBarPct[lagId] = safePct;
+    },
+    refreshAvatarFx() {
+        const fx = $('c-player-avatar-fx');
+        if (!fx) return;
+        fx.className = 'combat-avatar-fx combat-avatar-fx-player';
+        if (!this.playerDots || this.playerDots.length === 0) return;
+        const uniqueIds = [...new Set(this.playerDots.map(dot => dot.id))];
+        uniqueIds.forEach(id => fx.classList.add(`fx-${id}`));
+        if (uniqueIds.length > 1) fx.classList.add('fx-mixed');
+        fx.classList.add('is-active');
+    },
+    burstAvatarFx(effectId) {
+        const fx = $('c-player-avatar-fx');
+        if (!fx) return;
+        const color = STATUS_TOAST_COLORS[effectId] || 'rgba(255,255,255,0.85)';
+        for (let i = 0; i < 8; i++) {
+            const p = document.createElement('span');
+            p.className = 'combat-avatar-fx-particle';
+            p.style.setProperty('--particle-color', color);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 20 + Math.random() * 38;
+            p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+            p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+            fx.appendChild(p);
+            setTimeout(() => p.remove(), 950);
+        }
+    },
+    showCombatToast(text, tone = 'status', effectId = '') {
+        const host = $('screen-combat');
+        if (!host) return;
+        const toast = document.createElement('div');
+        toast.className = `combat-toast combat-toast-${tone}`;
+        if (effectId && STATUS_TOAST_COLORS[effectId]) {
+            toast.style.setProperty('--toast-color', STATUS_TOAST_COLORS[effectId]);
+        }
+        toast.textContent = text;
+        host.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+        }, 900);
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 1400);
+    },
+    async playCollisionAnimation(type, result) {
         await wait(120);
-
-        // 3) Çarpışma anında sonucu uygula (hit/miss + damage)
         if (result && typeof result.apply === 'function') {
             result.apply();
         }
-
-        // 4) Avatarları eski pozisyonlarına geri kaydır
-        playerWrap.style.transform = 'translate(0px, 0px)';
-        enemyWrap.style.transform = 'translate(0px, 0px)';
-        await wait(150);
-        playerWrap.style.transition = origPlayerTransition;
-        enemyWrap.style.transition = origEnemyTransition;
     },
     async playDodgeAnimation(attacker, result) {
-        const playerWrap = document.querySelector('.combat-avatar-player');
-        const enemyWrap = document.querySelector('.combat-avatar-enemy');
-        if (!playerWrap || !enemyWrap) {
-            if (result && typeof result.apply === 'function') result.apply();
-            return;
-        }
-
-        const origPlayerTransition = playerWrap.style.transition;
-        const origEnemyTransition = enemyWrap.style.transition;
-        playerWrap.style.transition = 'transform 0.18s ease-out';
-        enemyWrap.style.transition = 'transform 0.18s ease-out';
-
-        const pRect = playerWrap.getBoundingClientRect();
-        const eRect = enemyWrap.getBoundingClientRect();
-        const pCenterY = pRect.top + pRect.height / 2;
-        const eCenterY = eRect.top + eRect.height / 2;
-        const midY = (pCenterY + eCenterY) / 2;
-        const pOffsetY = midY - pCenterY;
-        const eOffsetY = midY - eCenterY;
-
-        let pOffsetX = 0;
-        let eOffsetX = 0;
-
-        // 1) Y ekseninde hizalanma (hafif)
-        playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY}px)`;
-        enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY}px)`;
-        await wait(160);
-
-        // 2) Saldıran yine ileri doğru hamle yapsın, savunan sadece yukarı/aşağı kaçsın
-        const pCenterX = pRect.left + pRect.width / 2;
-        const eCenterX = eRect.left + eRect.width / 2;
-        const distX = eCenterX - pCenterX;
-        const attackerFrac = 0.7; // saldıran yine güçlü biçimde öne gelsin
-        const dodgeY = (Math.random() < 0.5 ? -1 : 1) * 22; // savunan için küçük yukarı/aşağı kaçış
-
-        // Çarpışma anındaki dodge hareketi başlarken sesi çal
         playSfx('dodge');
-
-        if (attacker === 'enemy') {
-            // Enemy öne atılır, player sadece Y ekseninde kaçıyor gibi
-            eOffsetX -= attackerFrac * distX;
-            playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY + dodgeY}px)`;
-            enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY}px)`;
-        } else {
-            // Player öne atılır, enemy sadece Y ekseninde kaçıyor gibi
-            pOffsetX += attackerFrac * distX;
-            playerWrap.style.transform = `translate(${pOffsetX}px, ${pOffsetY}px)`;
-            enemyWrap.style.transform = `translate(${eOffsetX}px, ${eOffsetY + dodgeY}px)`;
-        }
-
-        await wait(140);
-
+        await wait(100);
         if (result && typeof result.apply === 'function') {
             result.apply();
         }
-
-        // 3) Avatarları eski konumlarına döndür
-        playerWrap.style.transform = 'translate(0px, 0px)';
-        enemyWrap.style.transform = 'translate(0px, 0px)';
-        await wait(140);
-        playerWrap.style.transition = origPlayerTransition;
-        enemyWrap.style.transition = origEnemyTransition;
     },
-    async playerAttack(type) {
+    async playerAttack(type, targetIndex = null) {
         if (this.turn !== 'player' || this.actionLock) return;
+        if (this.mode === 'duo' && targetIndex === null && this.getLivingEnemies().length > 1 && type !== 'heal') {
+            this.pendingAttackType = type;
+            this.targetSelectionActive = true;
+            this.updateEnemyTargetUI();
+            this.logMessage('Choose which enemy to strike.');
+            return;
+        }
+        this.targetSelectionActive = false;
+        this.pendingAttackType = null;
+        if (typeof targetIndex === 'number' && Array.isArray(this.enemies) && this.enemies[targetIndex] && this.enemies[targetIndex].hp > 0) {
+            this.activeEnemyIndex = targetIndex;
+            this.syncActiveEnemy();
+            this.updateEnemyTargetUI();
+        }
         this.actionLock = true;
         const active = document.activeElement; if (active && typeof active.blur === 'function') active.blur();
         const acts = $('combat-actions');
         acts.style.opacity = '0.8';
         acts.style.pointerEvents = 'none';
-        const p = game.player; const e = this.enemy;
-        if(type === 'heal') {
-            const heal = Math.floor(this.maxHp * 0.4); this.hp = Math.min(this.maxHp, this.hp + heal);
-            this.showDmg(heal, 'player', 'heal');
-            this.logMessage(`You drink a potion and heal ${heal} HP.`);
-            this.updateUI(); this.setTurn('enemy'); this.actionLock = false; return;
-        }
-        let hit = this.calcHit(p.getEffectiveAtk(), e.def);
-        let mod = 1, bonus = 0, shake = 'shake-md';
-        if(type==='quick'){ bonus=15; mod=0.7; shake='shake-sm'; }
-        if(type==='power'){ bonus=-20; mod=1.5; shake='shake-lg'; }
-        const effectiveHit = Math.max(5, Math.min(99, hit + bonus));
-        const roll = rng(0,100);
-        const didHit = roll <= effectiveHit;
+        try {
+            const p = game.player; const e = this.enemy;
+            if(type === 'heal') {
+                const heal = Math.floor(this.maxHp * 0.4); this.hp = Math.min(this.maxHp, this.hp + heal);
+                this.showDmg(heal, 'player', 'heal');
+                this.logMessage(`You drink a potion and heal ${heal} HP.`);
+                this.updateUI(); this.setTurn('enemy'); return;
+            }
+            const profile = this.getPlayerAttackProfile(type);
+            let hit = this.calcHit(p.getEffectiveAtk(), e.def);
+            const effectiveHit = Math.max(5, Math.min(99, hit + profile.hitBonus));
+            const roll = rng(0,100);
+            const didHit = roll <= effectiveHit;
 
-        const attackResult = {
-            apply: () => {
-                if (didHit) {
-                    const range = p.getDmgRange();
-                    const baseDmg = rng(range.min, range.max);
-                    let dmg = Math.floor(baseDmg * mod);
-                    const critChance = 5 + p.stats.atk + p.getCritBonus();
-                    let isCrit = false;
-                    let isDisastrous = false;
-                    if (type === 'power') {
-                        const disastrousChancePlayer = 6;
-                        if (rng(0,100) < disastrousChancePlayer) {
-                            isDisastrous = true;
-                            const critLike = Math.floor(dmg * 1.5);
-                            dmg = Math.floor(critLike * 4);
-                        } else if (rng(0,100) < critChance) {
-                            isCrit = true;
-                            dmg = Math.floor(dmg * 1.5);
+            const attackResult = {
+                apply: () => {
+                    if (didHit) {
+                        const range = p.getDmgRange();
+                        const baseDmg = rng(range.min, range.max);
+                        let dmg = Math.floor(baseDmg * profile.damageMult);
+                        const critChance = 5 + p.getEffectiveAtk() + p.getCritBonus();
+                        let isCrit = false;
+                        let isDisastrous = false;
+                        if (type === 'power') {
+                            const disastrousChancePlayer = 6;
+                            if (rng(0,100) < disastrousChancePlayer) {
+                                isDisastrous = true;
+                                const critLike = Math.floor(dmg * 1.5);
+                                dmg = Math.floor(critLike * 4);
+                            } else if (rng(0,100) < critChance) {
+                                isCrit = true;
+                                dmg = Math.floor(dmg * 1.5);
+                            }
+                        } else {
+                            if (rng(0,100) < critChance) {
+                                isCrit = true;
+                                dmg = Math.floor(dmg * 1.5);
+                            }
+                        }
+                        const targetEnemy = this.syncActiveEnemy();
+                        this.takeDamage(dmg, 'enemy');
+                        this.showDmg(dmg, 'enemy', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
+                        const label = type==='quick' ? 'Quick' : (type==='power' ? 'Power' : 'Normal');
+                        let critText = '';
+                        if (isDisastrous) critText = ' (DISASTROUS HIT!)';
+                        else if (isCrit) critText = ' (CRIT)';
+                        this.logMessage(`You use ${label} Attack and hit ${targetEnemy.name} for <span class="log-dmg">${dmg}</span>.${critText}`);
+                        this.triggerHitImpact(profile.shake, profile.blur, profile.impactDuration, {
+                            hitStopMs: profile.hitStopMs,
+                            particleColor: profile.particleColor,
+                            slashColor: profile.slashColor,
+                            impactSize: profile.impactSize,
+                            particleCount: isDisastrous ? 12 : (isCrit ? 10 : 7),
+                            slashCount: type === 'power' ? 4 : 2,
+                            impactAnimMs: isDisastrous ? 320 : (isCrit ? 280 : 240),
+                            impactCore: isDisastrous ? 'rgba(255,245,180,0.98)' : (isCrit ? 'rgba(255,226,120,0.96)' : undefined),
+                            impactMid: isDisastrous ? 'rgba(255,128,0,0.9)' : (isCrit ? 'rgba(255,184,0,0.88)' : undefined),
+                            impactGlow: isDisastrous ? 'rgba(255,98,0,0.92)' : (isCrit ? 'rgba(255,208,0,0.9)' : undefined)
+                        });
+                        if (isCrit) this.showCombatToast('CRITICAL', 'status');
+                        if (isDisastrous) this.showCombatToast('DISASTROUS', 'status');
+                        if (targetEnemy.hp <= 0) {
+                            this.flashFinisher(isDisastrous ? 'disastrous' : 'kill');
+                            const defeatedIndex = this.enemies.indexOf(targetEnemy);
+                            const cross = defeatedIndex === 1 ? $('enemy2-death-cross') : $('enemy-death-cross');
+                            if (cross) {
+                                cross.classList.remove('enemy-death-cross-anim');
+                                void cross.offsetWidth;
+                                cross.classList.add('enemy-death-cross-anim');
+                            }
+                            this.syncActiveEnemy();
                         }
                     } else {
-                        if (rng(0,100) < critChance) {
-                            isCrit = true;
-                            dmg = Math.floor(dmg * 1.5);
-                        }
+                        this.showDmg("DODGE", 'enemy', 'miss');
+                        this.logMessage(`Your attack misses ${e.name}.`);
                     }
-                    this.takeDamage(dmg, 'enemy');
-                    this.showDmg(dmg, 'enemy', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
-                    const label = type==='quick' ? 'Quick' : (type==='power' ? 'Power' : 'Normal');
-                    let critText = '';
-                    if (isDisastrous) critText = ' (DISASTROUS HIT!)';
-                    else if (isCrit) critText = ' (CRIT)';
-                    this.logMessage(`You use ${label} Attack and hit ${e.name} for <span class="log-dmg">${dmg}</span>.${critText}`);
-                    const c = $('game-container');
-                    const pWrap = document.querySelector('.combat-avatar-player');
-                    const eWrap = document.querySelector('.combat-avatar-enemy');
-                    if (c && pWrap && eWrap) {
-                        const pRect = pWrap.getBoundingClientRect();
-                        const eRect = eWrap.getBoundingClientRect();
-                        const pCenterX = pRect.left + pRect.width / 2;
-                        const pCenterY = pRect.top + pRect.height / 2;
-                        const eCenterX = eRect.left + eRect.width / 2;
-                        const eCenterY = eRect.top + eRect.height / 2;
-                        const impactX = (pCenterX + eCenterX) / 2;
-                        const impactY = (pCenterY + eCenterY) / 2;
-                        const contRect = c.getBoundingClientRect();
-                        c.style.setProperty('--impact-x', `${impactX - contRect.left}px`);
-                        c.style.setProperty('--impact-y', `${impactY - contRect.top}px`);
-                        c.classList.add(shake);
-                        c.classList.add('hit-impact');
-                        setTimeout(()=>{
-                            c.classList.remove(shake);
-                            c.classList.remove('hit-impact');
-                        },500);
-                    }
-                    if (e.hp <= 0) {
-                        const cross = $('enemy-death-cross');
-                        if (cross) {
-                            cross.classList.remove('enemy-death-cross-anim');
-                            void cross.offsetWidth;
-                            cross.classList.add('enemy-death-cross-anim');
-                        }
-                    }
-                } else {
-                    this.showDmg("DODGE", 'enemy', 'miss');
-                    this.logMessage(`Your attack misses ${e.name}.`);
+                    this.updateUI();
                 }
-                this.updateUI();
+            };
+
+            if (didHit) {
+                await this.playCollisionAnimation(type, attackResult);
+            } else {
+                await this.playDodgeAnimation('player', attackResult);
             }
-        };
 
-        if (didHit) {
-            await this.playCollisionAnimation(type, attackResult);
-        } else {
-            await this.playDodgeAnimation('player', attackResult);
-        }
-
-        if(e.hp <= 0) {
-            this.win();
-            this.actionLock = false;
-        } else {
-            await wait(800);
-            this.setTurn('enemy');
+            if(this.getLivingEnemies().length === 0) {
+                this.win();
+            } else {
+                await wait(800);
+                this.setTurn('enemy');
+            }
+        } catch (err) {
+            console.error('playerAttack error', err);
+            this.logMessage('Combat hiccup recovered.');
+            this.updateUI();
+        } finally {
             this.actionLock = false;
         }
     },
     async runEnemyTurn() {
         if (this.enemyActing) return;
         this.enemyActing = true;
-        $('enemy-think').style.display = 'block'; await wait(1500); $('enemy-think').style.display = 'none';
-        const p = game.player; const e = this.enemy;
-        let hit = this.calcHit(e.atk, p.stats.def);
-        hit = Math.max(5, Math.min(99, hit - p.getDodgeBonus()));
-        const roll = rng(0,100);
-        const didHit = roll <= hit;
-
-        const attackResult = {
-            apply: () => {
-                if (didHit) {
-                    const erange = this.getEnemyDmgRange(e);
-                    let dmg = rng(erange.min, erange.max);
-                    const critChanceEnemy = 5 + e.atk;
-                    let isCrit = false;
-                    let isDisastrous = false;
-                    const disastrousChanceEnemy = 3;
-                    if (rng(0,100) < disastrousChanceEnemy) {
-                        isDisastrous = true;
-                        const critLike = Math.floor(dmg * 1.5);
-                        dmg = Math.floor(critLike * 4);
-                    } else if (rng(0,100) < critChanceEnemy) {
-                        isCrit = true;
-                        dmg = Math.floor(dmg * 1.5);
-                    }
-                    this.takeDamage(dmg, 'player');
-                    this.showDmg(dmg, 'player', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
-                    let extra = '';
-                    if (isDisastrous) extra = ' (DISASTROUS HIT!)';
-                    else if (isCrit) extra = ' (CRIT)';
-                    this.logMessage(`${e.name} hits you for <span class="log-dmg">${dmg}</span>.${extra}`);
-                    const c = $('game-container');
-                    const pWrap = document.querySelector('.combat-avatar-player');
-                    const eWrap = document.querySelector('.combat-avatar-enemy');
-                    if (c && pWrap && eWrap) {
-                        const pRect = pWrap.getBoundingClientRect();
-                        const eRect = eWrap.getBoundingClientRect();
-                        const pCenterX = pRect.left + pRect.width / 2;
-                        const pCenterY = pRect.top + pRect.height / 2;
-                        const eCenterX = eRect.left + eRect.width / 2;
-                        const eCenterY = eRect.top + eRect.height / 2;
-                        const impactX = (pCenterX + eCenterX) / 2;
-                        const impactY = (pCenterY + eCenterY) / 2;
-                        const contRect = c.getBoundingClientRect();
-                        c.style.setProperty('--impact-x', `${impactX - contRect.left}px`);
-                        c.style.setProperty('--impact-y', `${impactY - contRect.top}px`);
-                        c.classList.add('shake-sm');
-                        c.classList.add('hit-impact');
-                        setTimeout(()=>{
-                            c.classList.remove('shake-sm');
-                            c.classList.remove('hit-impact');
-                        },400);
-                    }
-                    if (this.hp <= 0 && typeof game.handlePlayerDeath === 'function') {
-                        game.handlePlayerDeath();
-                    }
-                } else {
-                    this.showDmg("DODGE", 'player', 'miss');
-                    this.logMessage(`${e.name}'s attack misses you.`);
-                }
+        try {
+            $('enemy-think').style.display = 'block'; await wait(1500); $('enemy-think').style.display = 'none';
+            const p = game.player;
+            const attackers = this.getLivingEnemies();
+            for (let i = 0; i < attackers.length; i++) {
+                const e = attackers[i];
+                this.activeEnemyIndex = this.enemies.indexOf(e);
+                this.syncActiveEnemy();
                 this.updateUI();
+                let hit = this.calcHit(e.atk, p.getEffectiveDef());
+                hit = Math.max(5, Math.min(99, hit - p.getDodgeBonus()));
+                const roll = rng(0,100);
+                const didHit = roll <= hit;
+
+                const attackResult = {
+                    apply: () => {
+                        if (didHit) {
+                            const erange = this.getEnemyDmgRange(e);
+                            let dmg = rng(erange.min, erange.max);
+                            const critChanceEnemy = 5 + e.atk;
+                            let isCrit = false;
+                            let isDisastrous = false;
+                            const disastrousChanceEnemy = 3;
+                            if (rng(0,100) < disastrousChanceEnemy) {
+                                isDisastrous = true;
+                                const critLike = Math.floor(dmg * 1.5);
+                                dmg = Math.floor(critLike * 4);
+                            } else if (rng(0,100) < critChanceEnemy) {
+                                isCrit = true;
+                                dmg = Math.floor(dmg * 1.5);
+                            }
+                            this.takeDamage(dmg, 'player');
+                            this.applyEnemyOnHitEffects();
+                            this.showDmg(dmg, 'player', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
+                            let extra = '';
+                            if (isDisastrous) extra = ' (DISASTROUS HIT!)';
+                            else if (isCrit) extra = ' (CRIT)';
+                            this.logMessage(`${e.name} hits you for <span class="log-dmg">${dmg}</span>.${extra}`);
+                            this.triggerHitImpact('shake-md', 'combat-blur-md', 360, {
+                                hitStopMs: isDisastrous ? 85 : (isCrit ? 60 : 46),
+                                particleColor: isDisastrous ? 'rgba(255,110,64,0.95)' : 'rgba(255,138,128,0.92)',
+                                slashColor: 'rgba(255,244,214,0.88)',
+                                impactSize: isDisastrous ? 290 : (isCrit ? 250 : 220),
+                                particleCount: isDisastrous ? 11 : (isCrit ? 9 : 6),
+                                slashCount: isDisastrous ? 4 : 2,
+                                impactAnimMs: isDisastrous ? 320 : 260,
+                                impactCore: isDisastrous ? 'rgba(255,232,160,0.96)' : undefined,
+                                impactMid: isDisastrous ? 'rgba(255,100,50,0.9)' : undefined,
+                                impactGlow: isDisastrous ? 'rgba(255,60,0,0.9)' : undefined
+                            });
+                            if (isDisastrous) this.showCombatToast('BRUTAL HIT', 'status');
+                            if (this.hp <= 0 && typeof game.handlePlayerDeath === 'function') game.handlePlayerDeath();
+                        } else {
+                            this.showDmg("DODGE", 'player', 'miss');
+                            this.logMessage(`${e.name}'s attack misses you.`);
+                        }
+                        this.updateUI();
+                    }
+                };
+
+                if (didHit) await this.playCollisionAnimation('enemy', attackResult);
+                else await this.playDodgeAnimation('enemy', attackResult);
+                if (this.hp <= 0) break;
+                if (i < attackers.length - 1) await wait(420);
             }
-        };
 
-        if (didHit) {
-            await this.playCollisionAnimation('enemy', attackResult);
-        } else {
-            await this.playDodgeAnimation('enemy', attackResult);
+            if(this.hp > 0) {
+                await wait(500);
+                this.syncActiveEnemy();
+                this.setTurn('player');
+            }
+        } catch (err) {
+            console.error('runEnemyTurn error', err);
+            const think = $('enemy-think');
+            if (think) think.style.display = 'none';
+            this.logMessage('Enemy turn recovered.');
+            this.updateUI();
+            if (this.hp > 0) this.setTurn('player');
+        } finally {
+            this.enemyActing = false;
         }
-
-        if(this.hp > 0) {
-            await wait(500);
-            this.setTurn('player');
-        }
-        this.enemyActing = false;
     },
     win() {
         const p = game.player; p.wins++; 
         // ensure enemy HP bar visibly drains to 0 before victory
-        if (this.enemy && this.enemy.hp > 0) this.enemy.hp = 0;
+        if (Array.isArray(this.enemies)) this.enemies.forEach(e => { if (e && e.hp > 0) e.hp = 0; });
         // Önce HP/armor barlarını 0'a güncelle
         this.updateUI();
         // Sonra enemy avatar üzerinde death cross efektini tetikle
-        const cross = $('enemy-death-cross');
-        if (cross) {
-            cross.classList.remove('enemy-death-cross-anim');
-            void cross.offsetWidth; // force reflow to restart animation
-            cross.classList.add('enemy-death-cross-anim');
-        }
-        const baseGold = 20 + (this.enemy.lvl * 10); const baseXp = 50 + (this.enemy.lvl * 15);
-        const chr = p.stats.chr || 0;
-        let rewardMult = 1 + chr * 0.03; // each CHR = +3%
+        ['enemy-death-cross', 'enemy2-death-cross'].forEach(id => {
+            const cross = $(id);
+            if (cross && !cross.classList.contains('hidden')) {
+                cross.classList.remove('enemy-death-cross-anim');
+                void cross.offsetWidth;
+                cross.classList.add('enemy-death-cross-anim');
+            }
+        });
+        const totalEnemyLevels = (this.enemies || []).reduce((sum, e) => sum + ((e && e.lvl) || 0), 0) || ((this.enemy && this.enemy.lvl) || 1);
+        const baseGold = 30 + (totalEnemyLevels * 12);
+        const baseXp = 70 + (totalEnemyLevels * 20);
+        const chr = p.getEffectiveChr();
+        let rewardMult = 1 + chr * 0.025;
+        if (this.mode === 'no_armor') rewardMult += 0.35;
+        if (this.mode === 'duo') rewardMult += 0.75;
 
         // Trinketlerden gelen ekstra gold/xp çarpanları
         let goldBonus = 0;
@@ -3606,35 +4197,55 @@ const combat = {
     animateVal(id,s,e,d){ let obj=$(id),r=e-s,st=new Date().getTime(),et=st+d; let t=setInterval(()=>{ let n=new Date().getTime(),rem=Math.max((et-n)/d,0),v=Math.round(e-(rem*r)); obj.innerHTML=v; if(v==e)clearInterval(t); },20); },
     showDmg(val,t,type) {
         const el=$('dmg-overlay'); 
+        el.classList.remove('anim-gravity', 'anim-crit', 'anim-disastrous', 'anim-miss', 'anim-dot', 'anim-heal');
+        el.style.letterSpacing = '';
+        el.style.textShadow = '4px 4px 0 #000';
+        void el.offsetWidth;
 
         if(type==='disastrous'){
             el.innerHTML = `DISASTROUS HIT!<br>${val}!`;
             el.style.color = '#ff9100';
             el.style.fontSize = '5rem';
+            el.style.letterSpacing = '0.08em';
+            el.style.textShadow = '0 0 18px rgba(255,145,0,0.8), 4px 4px 0 #000';
+            el.classList.add('anim-disastrous');
         }
         else if(type==='crit'){
             el.innerHTML = `CRITICAL!<br>${val}!`;
             el.style.color = '#ffea00';
             el.style.fontSize = '4rem';
+            el.style.letterSpacing = '0.04em';
+            el.style.textShadow = '0 0 16px rgba(255,234,0,0.75), 4px 4px 0 #000';
+            el.classList.add('anim-crit');
         }
         else if(type==='miss'){
             el.innerText = "DODGE";
             el.style.color = '#ffeb3b';
             el.style.fontSize = '3.5rem';
+            el.classList.add('anim-miss');
         }
         else if(type==='dot'){
             // DOT hasarında pozitif sayı göster (eksi yok)
             el.innerText = `${val}`;
             el.style.color = '#d500f9';
             el.style.fontSize = '3.2rem';
+            el.style.textShadow = '0 0 14px rgba(213,0,249,0.75), 4px 4px 0 #000';
+            el.classList.add('anim-dot');
         }
         else {
             el.innerText = val;
             el.style.fontSize = '3.5rem';
             el.style.color = (type==='heal' ? '#00e676' : (t==='player' ? '#ff1744' : '#fff'));
+            if (type === 'heal') {
+                el.style.textShadow = '0 0 14px rgba(0,230,118,0.7), 4px 4px 0 #000';
+                el.classList.add('anim-heal');
+            } else {
+                el.classList.add('anim-gravity');
+            }
         }
-
-        el.classList.remove('anim-gravity'); void el.offsetWidth; el.classList.add('anim-gravity');
+        if (!el.classList.contains('anim-crit') && !el.classList.contains('anim-disastrous') && !el.classList.contains('anim-miss') && !el.classList.contains('anim-dot') && !el.classList.contains('anim-heal') && !el.classList.contains('anim-gravity')) {
+            el.classList.add('anim-gravity');
+        }
     }
 };
 

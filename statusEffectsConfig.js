@@ -29,20 +29,23 @@ const STATUS_EFFECTS_CONFIG = {
     },
     // Which enemies can apply which effects and with what chance on a successful hit
     enemies: {
-        Orc: [
+        orc: [
             { effect: 'bleed', chance: 0.35 }
         ],
-        Goblin: [
+        goblin: [
             { effect: 'poison', chance: 0.4 }
         ],
-        Bandit: [
-            { effect: 'bleed', chance: 0.4 }
-        ],
-        Skeleton: [
+        bandit: [
             { effect: 'bleed', chance: 0.25 }
         ],
-        Troll: [
-            { effect: 'burn', chance: 0.4 }
+        skeleton: [
+            { effect: 'bleed', chance: 0.25 }
+        ],
+        marauder: [
+            { effect: 'bleed', chance: 0.3 }
+        ],
+        paladin: [
+            { effect: 'burn', chance: 0.22 }
         ]
     }
 };
