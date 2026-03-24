@@ -122,12 +122,12 @@
                     <div class="hub-actions-grid">
                         <button class="btn btn-primary hub-action-btn hub-action-feature" onclick="game.openPitMenu()"><span class="hub-action-content"><span class="hub-action-title">THE PIT</span><span class="hub-action-sub">Enter the pit and chase gold, XP, and gear.</span></span><span class="hub-action-icon">⚔</span></button>
                         <button class="btn hub-action-btn" onclick="game.openShop('weapon')"><span class="hub-action-content"><span class="hub-action-title">WEAPONSMITH</span><span class="hub-action-sub">Browse blades, axes, hammers, and upgrades.</span></span><span class="hub-action-icon">🔨</span></button>
-                        <button class="btn hub-action-btn" onclick="game.openShop('armor')"><span class="hub-action-content"><span class="hub-action-title">ARMORY</span><span class="hub-action-sub">Fortify every slot with heavier protection.</span></span><span class="hub-action-icon">🛡</span></button>
-                        <button class="btn hub-action-btn" onclick="game.openShop('trinket')"><span class="hub-action-content"><span class="hub-action-title">TRINKET SHOP</span><span class="hub-action-sub">Stack passive boosts and rare curios.</span></span><span class="hub-action-icon">🔮</span></button>
                         <button class="btn hub-action-btn" onclick="game.openInventory()"><span class="hub-action-content"><span class="hub-action-title">INVENTORY</span><span class="hub-action-sub">Equip, compare, and sort your current haul.</span></span><span class="hub-action-icon">🎒</span></button>
+                        <button class="btn hub-action-btn" onclick="game.openShop('armor')"><span class="hub-action-content"><span class="hub-action-title">ARMORY</span><span class="hub-action-sub">Fortify every slot with heavier protection.</span></span><span class="hub-action-icon">🛡</span></button>
                         <button class="btn hub-action-btn" onclick="game.openCodex('weapon')"><span class="hub-action-content"><span class="hub-action-title">ITEM INDEX</span><span class="hub-action-sub">Inspect the wider catalog of gear and loot.</span></span><span class="hub-action-icon">📜</span></button>
-                        <button class="btn hub-action-btn" onclick="game.openPotionShop()"><span class="hub-action-content"><span class="hub-action-title">POTION SHOP</span><span class="hub-action-sub">Refill your bag before the next battle.</span></span><span class="hub-action-icon">🧪</span></button>
+                        <button class="btn hub-action-btn" onclick="game.openShop('trinket')"><span class="hub-action-content"><span class="hub-action-title">MAGIC SHOP</span><span class="hub-action-sub">Browse mystical trinkets, charms, and arcane boosts.</span></span><span class="hub-action-icon">🔮</span></button>
                         <button class="btn hub-action-btn hub-action-gamble" onclick="blackjack.open()"><span class="hub-action-content"><span class="hub-action-title">GAMBLE</span><span class="hub-action-sub">Risk gold for a fast payoff at the table.</span></span><span class="hub-action-icon">🎲</span></button>
+                        <button class="btn hub-action-btn" onclick="game.openPotionShop()"><span class="hub-action-content"><span class="hub-action-title">POTION SHOP</span><span class="hub-action-sub">Refill your bag before the next battle.</span></span><span class="hub-action-icon">🧪</span></button>
                     </div>
 
                     <div class="hub-bottom-row">
@@ -144,19 +144,19 @@
         <div id="turn-indicator" style="text-align:center; font-size:2.5rem; margin-top:5px; text-shadow:0 0 15px rgba(0,0,0,0.8);" class="text-green">PLAYER TURN</div>
 
         <!-- Enemy avatar portrait (click to inspect) -->
-        <div class="combat-avatar combat-avatar-enemy" onclick="combat.inspectEnemy(0)">
+        <div class="combat-avatar combat-avatar-enemy" onclick="combat.inspectEnemy(0)" onmouseenter="combat.previewTarget(0)" onmouseleave="combat.clearTargetPreview()">
             <img id="c-enemy-avatar" src="" alt="Enemy" />
             <!-- Enemy death cross effect overlay -->
             <img id="enemy-death-cross" src="assets/images/general-icons/red-cross.png" alt="X" />
         </div>
-        <div id="combat-avatar-enemy-2" class="combat-avatar combat-avatar-enemy combat-avatar-enemy-2 hidden" onclick="combat.inspectEnemy(1)">
+        <div id="combat-avatar-enemy-2" class="combat-avatar combat-avatar-enemy combat-avatar-enemy-2 hidden" onclick="combat.inspectEnemy(1)" onmouseenter="combat.previewTarget(1)" onmouseleave="combat.clearTargetPreview()">
             <img id="c-enemy2-avatar" src="" alt="Enemy 2" />
             <img id="enemy2-death-cross" src="assets/images/general-icons/red-cross.png" alt="X" />
         </div>
 
         <!-- ENEMY -->
-        <div class="combat-unit enemy-unit" onclick="combat.setActiveEnemy(0)">
-            <button id="enemy-target-btn-1" class="enemy-target-btn hidden" onclick="event.stopPropagation(); combat.setActiveEnemy(0)">1</button>
+        <div class="combat-unit enemy-unit" onclick="combat.setActiveEnemy(0)" onmouseenter="combat.previewTarget(0)" onmouseleave="combat.clearTargetPreview()">
+            <button id="enemy-target-btn-1" class="enemy-target-btn hidden" aria-label="Target enemy 1" onclick="event.stopPropagation(); combat.setActiveEnemy(0)"></button>
 
             <div style="font-size:1.4rem;">
                 <span id="c-enemy-name">Orc</span> <span id="c-enemy-lvl" style="color:#666; font-size:1rem;">Lvl 1</span>
@@ -226,8 +226,8 @@
             <!-- Player death cross effect overlay -->
             <img id="player-death-cross" src="assets/images/general-icons/red-cross.png" alt="X" />
         </div>
-        <div id="enemy-unit-2" class="combat-unit enemy-unit enemy-unit-2 hidden" onclick="combat.setActiveEnemy(1)">
-            <button id="enemy-target-btn-2" class="enemy-target-btn hidden" onclick="event.stopPropagation(); combat.setActiveEnemy(1)">2</button>
+        <div id="enemy-unit-2" class="combat-unit enemy-unit enemy-unit-2 hidden" onclick="combat.setActiveEnemy(1)" onmouseenter="combat.previewTarget(1)" onmouseleave="combat.clearTargetPreview()">
+            <button id="enemy-target-btn-2" class="enemy-target-btn hidden" aria-label="Target enemy 2" onclick="event.stopPropagation(); combat.setActiveEnemy(1)"></button>
             <div style="font-size:1.4rem;">
                 <span id="c-enemy2-name">Orc</span> <span id="c-enemy2-lvl" style="color:#666; font-size:1rem;">Lvl 1</span>
             </div>

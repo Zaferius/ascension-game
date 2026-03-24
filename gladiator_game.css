@@ -249,8 +249,8 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     filter: saturate(1.18) contrast(1.06);
 }
 .combat-unit { position: absolute; width: 340px; }
-.enemy-unit { top: 70px; right: 50px; text-align: right; }
-.enemy-unit-2 { top: 320px; right: 50px; }
+.enemy-unit { top: 64px; right: 58px; text-align: right; width: 360px; }
+.enemy-unit-2 { top: 346px; right: 58px; text-align: right; width: 360px; }
 .player-unit { bottom: 170px; left: 50px; }
 /* Combat avatars (player/enemy portraits) */
 .combat-avatar {
@@ -273,6 +273,10 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     object-fit:cover;
     transform: scale(1.12);
     transform-origin: center center;
+}
+#c-enemy2-avatar {
+    object-position: center center;
+    transform: scale(1.12) translateX(70px);
 }
 .combat-avatar-fx {
     position: absolute;
@@ -343,21 +347,21 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 }
 /* Enemy portrait: below enemy HP/armor bars on the right */
 .combat-avatar-enemy {
-    right:50px;
-    top:175px;
+    right: 58px;
+    top: 160px;
 }
-.combat-avatar-enemy-2 { top: 425px; right: 50px; }
+.combat-avatar-enemy-2 { top: 442px; right: 58px; }
 .combat-avatar.is-targeted,
 .combat-unit.is-targeted {
-    box-shadow: 0 0 0 2px rgba(236,1,35,0.4), 0 0 22px rgba(236,1,35,0.18);
+    box-shadow: none;
 }
 .combat-avatar.is-selecting-target,
 .combat-unit.is-selecting-target {
-    transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+    transition: none;
 }
 .combat-avatar.is-selecting-target:hover,
 .combat-unit.is-selecting-target:hover {
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.2), 0 0 18px rgba(255,255,255,0.08);
+    box-shadow: none;
 }
 .combat-unit { cursor: default; }
 .enemy-unit,
@@ -366,46 +370,61 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 .combat-avatar-enemy-2 { cursor: pointer; }
 .enemy-target-btn {
     position: absolute;
-    left: -22px;
+    left: -98px;
     top: 50%;
     transform: translateY(-50%);
-    width: 44px;
-    height: 44px;
+    width: 58px;
+    height: 58px;
     border-radius: 999px;
-    border: 2px solid rgba(255,255,255,0.18);
+    border: 2px solid rgba(255,255,255,0.22);
     background: rgba(15,15,18,0.92);
-    color: #f1f1f4;
-    font-size: 1.2rem;
+    color: transparent;
+    font-size: 0;
     box-shadow: 0 10px 20px rgba(0,0,0,0.28);
     z-index: 30;
 }
+.enemy-target-btn::after {
+    content: '';
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.74);
+    box-shadow: 0 0 10px rgba(255,255,255,0.18);
+}
 .enemy-target-btn:hover { background: rgba(30,30,36,0.96); }
+.enemy-target-btn:hover::after { background: rgba(255,255,255,0.9); }
 .enemy-target-btn.is-active {
     border-color: rgba(236,1,35,0.48);
     box-shadow: 0 0 0 3px rgba(236,1,35,0.14), 0 10px 20px rgba(0,0,0,0.28);
 }
+.enemy-target-btn.is-active::after {
+    background: #ec0123;
+    box-shadow: 0 0 14px rgba(236,1,35,0.35);
+}
 .combat-target-prompt {
     position: absolute;
-    top: 92px;
-    right: 110px;
+    top: 108px;
+    right: 176px;
     z-index: 32;
-    font-size: 1.1rem;
+    font-size: 1.18rem;
     color: #ec0123;
     letter-spacing: 0.08rem;
     text-shadow: 0 0 12px rgba(236,1,35,0.24);
+    pointer-events: none;
 }
 /* Enemy / player death cross overlay on top of avatars */
 #enemy-death-cross,
+#enemy2-death-cross,
 #player-death-cross {
     position:absolute;
     top:50%;
     left:50%;
-    width:120%;
-    height:120%;
+    width:108%;
+    height:108%;
     object-fit:contain;
     pointer-events:none;
     opacity:0;
-    transform:translate(-50%, -50%) scale(1.8);
+    transform:translate(-50%, -50%) scale(1.38);
     transform-origin:center center;
     z-index:30;
 }
@@ -414,9 +433,9 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     animation: enemyDeathCrossIn 0.45s cubic-bezier(.25, .00, .30, 1.00) forwards;
 }
 @keyframes enemyDeathCrossIn {
-    0% { opacity:0; transform:translate(-50%, -50%) scale(2.2) rotate(-10deg); }
-    30% { opacity:1; transform:translate(-50%, -50%) scale(1.6) rotate(3deg); }
-    100% { opacity:1; transform:translate(-50%, -50%) scale(1.1) rotate(0deg); }
+    0% { opacity:0; transform:translate(-50%, -50%) scale(1.7) rotate(-10deg); }
+    30% { opacity:1; transform:translate(-50%, -50%) scale(1.3) rotate(3deg); }
+    100% { opacity:1; transform:translate(-50%, -50%) scale(1.02) rotate(0deg); }
 }
 /* Blood vignette when player is hit */
 #blood-vignette {

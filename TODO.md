@@ -2,8 +2,10 @@
 -Büyücü itemleri büyü yapma olayı
 -Shoplara UI polish(opencode biliyor)
 -Trinket Shop ismi Magic Shop olarak değişir. Silahlara büyü basma yeri ve Trinket burda satılır. THE PIT Uı'ı gibi 2 kutu yanyana buton. DOT Hasarı karakterlerden cıkıp silahlara verilir bu sayede
--1v2 UI düzeni polish lazım. 2 kisi sagda ortalansın. Seçim için çıkan dairede sayı yazmasın. Avatarlar üst üste geliyor düzelsin. 
-
+-Hub city oyun butonları düzeninde, sağ taraftaki butonlar Shop butonları olsun. (weaponsmith, armory, Magic Shop(eski adı Trinket Shop, Potion Shop)). Sol taraftakilerde geri kalanlar
+-Dostum bir de "Iron City Tournament" adı altında turnuva sitemi üretmek istiyorum. her 3 levelda 1 açılan yeni turnuvalara girmeye hak kazanıyor oyuncu. ve her turnuvada daha fazla düsmanla karsılasıyor daha zorlu düsmanlarla karsılasıyor. Bu sistemi istiyorum. Hub city butonlarında "The Pit" butonunun altında yer alabilir. Girebileceği zaman oyuncu buton aktif görünür etrafı gold renkte glow olur. Girdikten sonra sıra sıra turnuva düsmanlarıyla savaşır. Turnuvayı bitirdiğinde de yüklü miktarda Gold ve Exp kazanır. (Turnuva Level'ine ulastıktan sonra turnuva dısında dövüşmek exp kazandırmaz yalnızca gold kazandırır).
+-Dövüşlerden önce stat karşılaştırma ekranı tasarlayalım dostum aynı swords and sandalsta oldugu gibi. Oyuncu dövüşe girip çıkma hakkı tanıyalım. (ilerde bazı dövüşlerde bunu iptal ederiz oyuncu kaçamaz.)
+Akabinde de The pit modlarından olan "No Armor" modunun adını "No Armor, No Escape" olarak değiştirelim. Oyuncu bir kere tıkladıktan sonra aa bu zormuş diyip çıkamaz bu modda.
 
 -perhance enemy avatar seed: //// (seed:::876714083)
 Enemy Avatar Prompt:

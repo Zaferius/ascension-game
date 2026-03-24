@@ -1022,7 +1022,17 @@ const game = {
                 if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
             } else if (item.type === 'armor') {
                 const val = (typeof item.val === 'number') ? item.val : 0;
-                lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
+                let armorLine = `${val}`;
+                const equipped = this.player && this.player.gear && item.slot ? this.player.gear[item.slot] : null;
+                if (equipped && typeof equipped.val === 'number') {
+                    const diff = val - equipped.val;
+                    if (diff !== 0) {
+                        const sign = diff > 0 ? '+' : '';
+                        const diffCls = diff > 0 ? 'text-green' : 'text-red';
+                        armorLine += ` <span class="${diffCls}" style="font-size:0.85rem;">(${sign}${diff})</span>`;
+                    }
+                }
+                lines.push(`<div><span class="text-shield">Armor:</span> ${armorLine}</div>`);
                 if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
             } else if (item.type === 'trinket') {
                 if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
@@ -1817,7 +1827,17 @@ const game = {
                 if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
             } else if (item.type === 'armor') {
                 const val = (typeof item.val === 'number') ? item.val : 0;
-                lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
+                let armorLine = `${val}`;
+                const equipped = this.player && this.player.gear && item.slot ? this.player.gear[item.slot] : null;
+                if (equipped && typeof equipped.val === 'number') {
+                    const diff = val - equipped.val;
+                    if (diff !== 0) {
+                        const sign = diff > 0 ? '+' : '';
+                        const diffCls = diff > 0 ? 'text-green' : 'text-red';
+                        armorLine += ` <span class="${diffCls}" style="font-size:0.85rem;">(${sign}${diff})</span>`;
+                    }
+                }
+                lines.push(`<div><span class="text-shield">Armor:</span> ${armorLine}</div>`);
                 if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
             } else if (item.type === 'trinket') {
                 if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
@@ -2782,6 +2802,7 @@ const combat = {
     hp: 0, maxHp: 0, armor: 0, maxArmor: 0, enemy: null, turn: 'player', actionLock: false,
     enemies: [], activeEnemyIndex: 0,
     targetSelectionActive: false, pendingAttackType: null,
+    hoverTargetIndex: null,
     enemyActing: false, // guard to prevent overlapping enemy turns
     playerDots: [], // active DOT effects on player
     dotResist: {},  // per-combat resistance per DOT id (0-1)
@@ -2810,6 +2831,7 @@ const combat = {
     setActiveEnemy(index = 0) {
         if (!Array.isArray(this.enemies) || !this.enemies[index] || this.enemies[index].hp <= 0) return;
         this.activeEnemyIndex = index;
+        this.hoverTargetIndex = null;
         this.syncActiveEnemy();
         this.updateEnemyTargetUI();
         if (this.targetSelectionActive && this.turn === 'player' && this.pendingAttackType) {
@@ -2819,6 +2841,19 @@ const combat = {
             this.playerAttack(pending, index);
         }
     },
+    previewTarget(index = 0) {
+        if (!this.targetSelectionActive) return;
+        if (!Array.isArray(this.enemies) || !this.enemies[index] || this.enemies[index].hp <= 0) return;
+        this.hoverTargetIndex = index;
+        this.updateEnemyTargetUI();
+        this.updateUI();
+    },
+    clearTargetPreview() {
+        if (!this.targetSelectionActive) return;
+        this.hoverTargetIndex = null;
+        this.updateEnemyTargetUI();
+        this.updateUI();
+    },
     updateEnemyTargetUI() {
         const avatar1 = document.querySelector('.combat-avatar-enemy:not(.combat-avatar-enemy-2)');
         const avatar2 = $('combat-avatar-enemy-2');
@@ -2826,7 +2861,6 @@ const combat = {
         const unit2 = $('enemy-unit-2');
         const btn1 = $('enemy-target-btn-1');
         const btn2 = $('enemy-target-btn-2');
-        const prompt = $('combat-target-prompt');
         [avatar1, avatar2, unit1, unit2].forEach(el => el && el.classList.remove('is-targeted'));
         if (this.activeEnemyIndex === 0) {
             if (avatar1) avatar1.classList.add('is-targeted');
@@ -2839,14 +2873,13 @@ const combat = {
         if (btn1) {
             const show1 = this.mode === 'duo' && this.targetSelectionActive && !!(this.enemies[0] && this.enemies[0].hp > 0);
             btn1.classList.toggle('hidden', !show1);
-            btn1.classList.toggle('is-active', show1 && this.activeEnemyIndex === 0);
+            btn1.classList.toggle('is-active', show1 && ((this.hoverTargetIndex ?? this.activeEnemyIndex) === 0));
         }
         if (btn2) {
             const show2 = this.mode === 'duo' && this.targetSelectionActive && !!(this.enemies[1] && this.enemies[1].hp > 0);
             btn2.classList.toggle('hidden', !show2);
-            btn2.classList.toggle('is-active', show2 && this.activeEnemyIndex === 1);
+            btn2.classList.toggle('is-active', show2 && ((this.hoverTargetIndex ?? this.activeEnemyIndex) === 1));
         }
-        if (prompt) prompt.classList.toggle('hidden', !(this.mode === 'duo' && this.targetSelectionActive));
     },
     buildEnemyCombatant(enemyGen, mode) {
         const p = game.player;
@@ -3435,7 +3468,7 @@ const combat = {
         this.potionSlots = [null, null, null];
     },
     updateUI() {
-        this.syncActiveEnemy();
+        const activeTarget = this.syncActiveEnemy();
         const e1 = this.enemies[0] || this.enemy;
         if (!e1) return;
         if (!this.targetSelectionActive) this.pendingAttackType = null;
@@ -3510,11 +3543,18 @@ const combat = {
         this.refreshAvatarFx();
 
         if(this.turn === 'player') {
-            const hit = this.calcHit(game.player.getEffectiveAtk(), e1.def);
-            const q = Math.max(5, Math.min(99, hit + 18));
-            const n = Math.max(5, Math.min(99, hit));
-            const p = Math.max(5, Math.min(99, hit - 12));
-            $('hit-quick').innerText = q + "%"; $('hit-normal').innerText = n + "%"; $('hit-power').innerText = p + "%";
+            const previewEnemy = (typeof this.hoverTargetIndex === 'number' && this.targetSelectionActive && this.enemies[this.hoverTargetIndex] && this.enemies[this.hoverTargetIndex].hp > 0)
+                ? this.enemies[this.hoverTargetIndex]
+                : (!this.targetSelectionActive ? activeTarget : null);
+            if (previewEnemy) {
+                const hit = this.calcHit(game.player.getEffectiveAtk(), previewEnemy.def);
+                const q = Math.max(5, Math.min(99, hit + 18));
+                const n = Math.max(5, Math.min(99, hit));
+                const p = Math.max(5, Math.min(99, hit - 12));
+                $('hit-quick').innerText = q + "%"; $('hit-normal').innerText = n + "%"; $('hit-power').innerText = p + "%";
+            } else {
+                $('hit-quick').innerText = '--'; $('hit-normal').innerText = '--'; $('hit-power').innerText = '--';
+            }
         }
         this.updateEnemyTargetUI();
     },
@@ -3936,12 +3976,15 @@ const combat = {
         if (this.mode === 'duo' && targetIndex === null && this.getLivingEnemies().length > 1 && type !== 'heal') {
             this.pendingAttackType = type;
             this.targetSelectionActive = true;
+            this.hoverTargetIndex = null;
             this.updateEnemyTargetUI();
+            this.updateUI();
             this.logMessage('Choose which enemy to strike.');
             return;
         }
         this.targetSelectionActive = false;
         this.pendingAttackType = null;
+        this.hoverTargetIndex = null;
         if (typeof targetIndex === 'number' && Array.isArray(this.enemies) && this.enemies[targetIndex] && this.enemies[targetIndex].hp > 0) {
             this.activeEnemyIndex = targetIndex;
             this.syncActiveEnemy();
