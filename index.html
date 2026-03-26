@@ -9,6 +9,7 @@
     <script src="armor_catalog.js"></script>
     <script src="trinket_catalog.js"></script>
     <script src="enemy_config.js"></script>
+    <script src="skill_tree.js"></script>
     <script src="sfxConfig.js"></script>
     <script src="ui_audio.js"></script>
     <script src="gladiator_game.js"></script>
@@ -55,7 +56,7 @@
                         <img src="assets/images/ingame-avatars/player.png" alt="Gladiator Avatar">
                     </div>
                     <div class="create-basic-fields">
-                        <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12" style="margin-bottom:10px; width:100%;" class="hidden">
+                        <input type="text" id="inp-name" placeholder="Enter Name" maxlength="12" style="margin-bottom:10px; width:100%;">
                         <select id="inp-class" style="margin-bottom:16px; width:100%;" onchange="game.createCharacter()" class="hidden">
 
                             <option value="Warrior">Warrior – +8% Dodge, +1 ATK per 3 ATK</option>
@@ -82,6 +83,7 @@
                     </div>
                 </div>
                 <div class="creation-notes">
+                    <div class="creation-note-card"><strong>Name</strong><span>Choose what the arena crowd will chant when you step into the sand.</span></div>
                     <div class="creation-note-card"><strong>Class</strong><span>Your class passive shapes the entire run, so commit with intent.</span></div>
                 </div>
             </div>
@@ -137,6 +139,7 @@
                     <h4 class="hub-panel-title hub-panel-title-centered" style="margin-top:0;"><span>EQUIPMENT</span></h4>
                     <div id="ui-equip"></div>
                     <div class="hub-sidebar-actions">
+                        <button class="btn hub-utility-btn" onclick="game.openSkillTree()">✦ SKILL TREE</button>
                         <button class="btn hub-utility-btn" onclick="game.saveGameManually()">💾 SAVE GAME</button>
                         <button class="btn hub-utility-btn" onclick="game.goToMainMenu()">⬅ MAIN MENU</button>
                     </div>
@@ -205,6 +208,7 @@
                     <div id="c-enemy-hp" class="bar-fill enemy-fill" style="background:var(--accent-red);"></div>
                 </div>
             </div>
+            <div class="enemy-status-row"><span id="enemy-status-icons"></span></div>
         </div>
 
         <!-- THINKING TEXT -->
@@ -273,6 +277,7 @@
                     <div id="c-enemy2-hp" class="bar-fill enemy-fill" style="background:var(--accent-red);"></div>
                 </div>
             </div>
+            <div class="enemy-status-row"><span id="enemy2-status-icons"></span></div>
         </div>
 
         <!-- DOT icons stack near player avatar -->
@@ -289,10 +294,14 @@
 
     <!-- SHOP/INV -->
     <div id="screen-list" class="menu-screen hidden" style="justify-content: flex-start; padding-top:40px;">
-        <div style="display:flex; justify-content:space-between; width:90%; align-items:center;">
+        <div class="list-shell">
+        <div class="list-topbar">
             <div class="list-title-wrap">
                 <button id="btn-list-back" class="btn list-back-btn" onclick="game.showHub()">&lt;</button>
-                <h2 id="list-title" style="margin:0;">SHOP</h2>
+                <div>
+                    <h2 id="list-title" style="margin:0;">SHOP</h2>
+                    <div class="list-title-sub">Browse, compare, and trade gear with confidence.</div>
+                </div>
             </div>
             <div class="list-top-right">
                 <button id="btn-trade-toggle" class="btn list-trade-btn hidden" onclick="game.toggleTradeMode()">Sell</button>
@@ -302,7 +311,8 @@
                 </div>
             </div>
         </div>
-        <div style="width:95%; margin-top:10px; position:relative;">
+        <div class="list-panel">
+        <div class="list-inner">
             <div id="list-header-extra" class="list-header-extra"></div>
             <div class="shop-header">
                 <div>ITEM</div>
@@ -315,6 +325,8 @@
             <div id="list-container" class="item-list"></div>
             <!-- Inventory-only potion slot card (filled by JS when viewing inventory) -->
             <div id="inv-potion-slots-card" class="potion-slot-card hidden"></div>
+        </div>
+        </div>
         </div>
     </div>
 
@@ -384,43 +396,71 @@
     </div>
 
     <div id="modal-death" class="modal-overlay hidden">
-        <div class="modal-box">
-            <h1 class="text-red" style="margin:0; font-size:3rem;">DEFEAT</h1>
-            <p style="color:#aaa;">You have fallen in the arena.</p>
-            <div style="font-size:1.1rem; margin:16px 0 10px 0; color:#eee;">
-                <div>Gold Lost: <span id="death-gold-lost" class="text-red">0</span></div>
-                <div style="margin-top:4px;">Gold Remaining: <span id="death-gold-remaining" class="text-gold">0</span></div>
+        <div class="modal-box defeat-modal">
+            <div class="victory-kicker">Arena Result</div>
+            <h1 class="defeat-title">DEFEAT</h1>
+            <p class="defeat-subtitle">You fall in the sand, and the crowd moves on without you.</p>
+            <div class="victory-reward-grid">
+                <div class="victory-reward-card defeat-loss-card">
+                    <div class="victory-reward-label">Gold Lost</div>
+                    <div class="victory-reward-value text-red">-<span id="death-gold-lost">0</span></div>
+                </div>
+                <div class="victory-reward-card victory-gold-card">
+                    <div class="victory-reward-label">Gold Remaining</div>
+                    <div class="victory-reward-value text-gold"><span id="death-gold-remaining">0</span></div>
+                </div>
             </div>
-            <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="game.handleDeathContinue()">RETURN TO HUB</button>
+            <button class="btn defeat-continue-btn" onclick="game.handleDeathContinue()">RETURN TO HUB</button>
         </div>
     </div>
 
     <div id="modal-gamble" class="modal-overlay hidden">
-        <div class="modal-box" style="width:500px; border-color:#7b1fa2;">
+        <div class="modal-box blackjack-modal">
             <div class="close-btn" onclick="blackjack.close()">&times;</div>
-            <h2 class="text-purple">BLACKJACK</h2>
+            <div class="levelup-kicker">High Stakes Corner</div>
+            <h2 class="blackjack-title">BLACKJACK</h2>
+            <div class="blackjack-subtitle">Double your coin if your nerve holds.</div>
             <div id="bj-setup">
-                <p>Place your bet:</p>
-                <input type="number" id="bj-bet" value="50" min="10" style="width:100px;">
-                <button class="btn btn-primary" onclick="blackjack.deal()">DEAL</button>
-                <p style="font-size:0.8rem; color:#888;">Current Gold: 💰 <span id="bj-gold">0</span></p>
+                <div class="blackjack-setup-card">
+                    <div>
+                        <div class="blackjack-setup-label">Place your bet</div>
+                        <div class="blackjack-gold-readout">Current Gold: 💰 <span id="bj-gold">0</span></div>
+                    </div>
+                    <div class="blackjack-bet-controls">
+                        <div class="blackjack-bet-panel">
+                            <div class="blackjack-bet-total">Bet: <span id="bj-bet-total">0</span></div>
+                            <div class="blackjack-chip-row">
+                                <button class="btn blackjack-chip" onclick="blackjack.addBet(5)">5</button>
+                                <button class="btn blackjack-chip" onclick="blackjack.addBet(10)">10</button>
+                                <button class="btn blackjack-chip" onclick="blackjack.addBet(20)">20</button>
+                                <button class="btn blackjack-chip" onclick="blackjack.addBet(50)">50</button>
+                                <button class="btn blackjack-chip" onclick="blackjack.addBet(100)">100</button>
+                            </div>
+                            <div class="blackjack-chip-row blackjack-chip-row-utility">
+                                <button class="btn blackjack-chip blackjack-chip-utility" onclick="blackjack.clearBet()">Clear</button>
+                                <button class="btn blackjack-chip blackjack-chip-utility" onclick="blackjack.maxBet()">Max</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="blackjack.deal()">DEAL</button>
+                    </div>
+                </div>
             </div>
             <div id="bj-game" class="hidden">
                 <div class="card-table">
-                    <div><div style="color:#aaa; font-size:0.8rem;">DEALER</div><div id="dealer-hand" class="hand-area"></div><div id="dealer-score" style="color:#fff;"></div></div>
-                    <div id="bj-msg" style="text-align:center; font-weight:bold; font-size:1.2rem; color:#fff;"></div>
-                    <div><div style="color:#aaa; font-size:0.8rem;">YOU</div><div id="player-hand" class="hand-area"></div><div id="player-score" style="color:#fff;"></div></div>
+                    <div class="blackjack-seat"><div class="blackjack-seat-label">DEALER</div><div id="dealer-hand" class="hand-area"></div><div id="dealer-score" class="blackjack-score"></div></div>
+                    <div id="bj-msg" class="blackjack-msg"></div>
+                    <div class="blackjack-seat"><div class="blackjack-seat-label">YOU</div><div id="player-hand" class="hand-area"></div><div id="player-score" class="blackjack-score"></div></div>
                     <div id="bj-result-overlay" class="bj-result hidden">
                         <div class="bj-result-box">
                             <div id="bj-result-text">RESULT</div>
                         </div>
                     </div>
                 </div>
-                <div style="margin-top:15px;" id="bj-controls">
+                <div class="blackjack-action-row" id="bj-controls">
                     <button class="btn" onclick="blackjack.hit()">HIT</button>
                     <button class="btn" onclick="blackjack.stand()">STAND</button>
                 </div>
-                <button id="bj-reset" class="btn hidden" onclick="blackjack.reset()">PLAY AGAIN</button>
+                <button id="bj-reset" class="btn blackjack-reset-btn hidden" onclick="blackjack.reset()">PLAY AGAIN</button>
             </div>
         </div>
     </div>
@@ -481,9 +521,19 @@
         <div class="modal-box levelup-modal">
             <div class="levelup-kicker">Ascension</div>
             <h1 class="levelup-title">LEVEL UP!</h1>
-            <div class="levelup-points">Points Remaining <span id="lvl-pts" class="text-green">3</span></div>
+            <div class="levelup-points">Stats Remaining <span id="lvl-pts" class="text-green">3</span> <span class="levelup-skill-points">Skill Point +<span id="lvl-skill-pts">1</span></span></div>
             <div id="stat-allocator" class="levelup-grid"></div>
             <button id="btn-lvl-confirm" class="btn levelup-confirm-btn" onclick="game.confirmLevelUp()">CONFIRM ASCENSION</button>
+        </div>
+    </div>
+
+    <div id="modal-skilltree" class="modal-overlay hidden">
+        <div class="modal-box skilltree-modal">
+            <div class="close-btn" onclick="game.closeSkillTree()">&times;</div>
+            <div class="levelup-kicker">Discipline</div>
+            <h1 class="skilltree-title">SKILL TREE</h1>
+            <div class="skilltree-topline">Skill Points <span id="skilltree-points" class="text-green">0</span></div>
+            <div id="skilltree-branches" class="skilltree-branches"></div>
         </div>
     </div>
 

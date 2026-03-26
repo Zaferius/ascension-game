@@ -28,25 +28,33 @@ const ARMOR_RARITY_CONFIG = {
     key: 'uncommon',
     css: 'rarity-uncommon',
     armorMult: 1.1,
-    statBudget: 2
+    statBudget: 2,
+    drawbackChance: 0.08,
+    drawbackBudget: 1
   },
   rare: {
     key: 'rare',
     css: 'rarity-rare',
     armorMult: 1.25,
-    statBudget: 4
+    statBudget: 4,
+    drawbackChance: 0.18,
+    drawbackBudget: 1
   },
   epic: {
     key: 'epic',
     css: 'rarity-epic',
     armorMult: 1.4,
-    statBudget: 6
+    statBudget: 6,
+    drawbackChance: 0.28,
+    drawbackBudget: 2
   },
   legendary: {
     key: 'legendary',
     css: 'rarity-legendary',
     armorMult: 1.6,
-    statBudget: 8
+    statBudget: 8,
+    drawbackChance: 0.1,
+    drawbackBudget: 2
   }
 };
 
@@ -82,6 +90,29 @@ const ARMOR_LEGENDARY_UNIQUE_NAMES = [
   'Helm of the Red Monarch'
 ];
 
+const ARMOR_ARCHETYPES = {
+  Heavy: [
+    { key: 'juggernaut', positive: ['def', 'def', 'vit'], negative: ['atk', 'chr'], drawbackLabel: 'Burdened' },
+    { key: 'fortress', positive: ['def', 'str', 'vit'], negative: ['mag'], drawbackLabel: 'Unwieldy' }
+  ],
+  Medium: [
+    { key: 'duelist', positive: ['def', 'atk', 'vit'], negative: ['chr'], drawbackLabel: 'Tense' },
+    { key: 'raider', positive: ['str', 'atk', 'def'], negative: ['mag'], drawbackLabel: 'Restless' }
+  ],
+  Light: [
+    { key: 'skirmisher', positive: ['atk', 'chr', 'vit'], negative: ['def'], drawbackLabel: 'Thin' },
+    { key: 'shadow', positive: ['atk', 'chr', 'mag'], negative: ['vit'], drawbackLabel: 'Fragile' }
+  ],
+  Mystic: [
+    { key: 'warded', positive: ['mag', 'mag', 'def'], negative: ['str'], drawbackLabel: 'Hollow' },
+    { key: 'ritual', positive: ['mag', 'chr', 'vit'], negative: ['def'], drawbackLabel: 'Cursed' }
+  ],
+  Shield: [
+    { key: 'bastion', positive: ['def', 'def', 'vit'], negative: ['atk', 'mag'], drawbackLabel: 'Heavy' },
+    { key: 'wall', positive: ['def', 'str', 'def'], negative: ['chr'], drawbackLabel: 'Rigid' }
+  ]
+};
+
 
 const ARMOR_BASE_TYPES = [
   { key: 'cloth_hood', slot: 'head', baseType: 'Hood', armorClass: 'Light', baseVal: 2, scale: 0.9 },
@@ -114,15 +145,32 @@ function armorRngChoice(arr) {
   return arr[armorRngInt(0, arr.length - 1)];
 }
 
-function armorAllocStats(armorClass, budget) {
-  const mods = { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
-  if (budget <= 0) return mods;
+function ensureArmorMods() {
+  return { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
+}
+
+function armorAllocStats(armorClass, budget, rarityKey) {
+  const mods = ensureArmorMods();
+  const rarity = ARMOR_RARITY_CONFIG[rarityKey] || ARMOR_RARITY_CONFIG.common;
   const weights = ARMOR_CLASS_WEIGHT_TABLE[armorClass] || ['vit', 'def', 'str', 'atk', 'chr', 'mag'];
+  const archetypes = ARMOR_ARCHETYPES[armorClass] || [];
+  const profile = archetypes.length ? { ...armorRngChoice(archetypes) } : { key: 'balanced', positive: [], negative: [], drawbackLabel: '' };
   for (let i = 0; i < budget; i++) {
-    const k = weights[armorRngInt(0, weights.length - 1)];
+    const source = profile.positive && profile.positive.length && armorRngInt(0, 99) < 65 ? profile.positive : weights;
+    const k = source[armorRngInt(0, source.length - 1)];
     mods[k] = (mods[k] || 0) + 1;
   }
-  return mods;
+  let hasDrawback = false;
+  const drawbackBudget = rarity.drawbackBudget || 0;
+  if (drawbackBudget > 0 && armorRngInt(0, 999) < Math.floor((rarity.drawbackChance || 0) * 1000)) {
+    hasDrawback = true;
+    const negativePool = (profile.negative && profile.negative.length) ? profile.negative : ARMOR_STAT_KEYS.filter(k => (mods[k] || 0) <= 0);
+    for (let i = 0; i < drawbackBudget; i++) {
+      const k = negativePool[armorRngInt(0, negativePool.length - 1)];
+      mods[k] = (mods[k] || 0) - 1;
+    }
+  }
+  return { mods, profile: { ...profile, hasDrawback } };
 }
 
 function armorDominantStat(statMods) {
@@ -136,6 +184,21 @@ function armorDominantStat(statMods) {
     }
   }
   return bestKey;
+}
+
+function armorDominantNegative(statMods) {
+  const negatives = ARMOR_STAT_KEYS.filter(key => (statMods[key] || 0) < 0);
+  if (!negatives.length) return null;
+  let worstKey = negatives[0];
+  let worstVal = 0;
+  for (const key of negatives) {
+    const v = statMods[key] || 0;
+    if (v < worstVal) {
+      worstVal = v;
+      worstKey = key;
+    }
+  }
+  return worstKey;
 }
 
 function computeArmorValue(baseVal, itemLevel, scale, rarityMult) {
@@ -155,12 +218,16 @@ function determineArmorMinShopLevel(avg) {
   return 3 * (bucket - 1) + 1; // 1->1, 2->4, 3->7, 4->10, 5->13, 6->16
 }
 
-function buildArmorName(baseType, rarityKey, statMods) {
+function buildArmorName(baseType, rarityKey, statMods, profile) {
   const rarity = ARMOR_RARITY_CONFIG[rarityKey];
   const prefixPool = rarity ? ['Worn', 'Sturdy', 'Reinforced', 'Runed', 'Blessed', 'Ancient'] : [];
-  const prefix = prefixPool.length ? armorRngChoice(prefixPool) : '';
+  let prefix = prefixPool.length ? armorRngChoice(prefixPool) : '';
   const dom = armorDominantStat(statMods);
   const suffix = ARMOR_STAT_SUFFIX[dom] || 'of Bastion';
+  const drawbackDom = armorDominantNegative(statMods);
+  if (profile && profile.hasDrawback && profile.drawbackLabel && rarityKey !== 'legendary' && armorRngInt(0, 99) < 70) {
+    prefix = `${profile.drawbackLabel} ${prefix}`.trim();
+  }
   if (rarityKey === 'legendary') {
     return armorRngChoice(ARMOR_LEGENDARY_UNIQUE_NAMES);
   }
@@ -179,6 +246,13 @@ function priceFromArmor(avg, itemLevel, rarityMult) {
   return Math.max(1, Math.round(base));
 }
 
+function armorAdjustedPrice(price, statMods) {
+  const positive = ARMOR_STAT_KEYS.reduce((sum, key) => sum + Math.max(0, statMods[key] || 0), 0);
+  const negative = ARMOR_STAT_KEYS.reduce((sum, key) => sum + Math.abs(Math.min(0, statMods[key] || 0)), 0);
+  const mult = 1 + positive * 0.05 - negative * 0.025;
+  return Math.max(1, Math.round(price * Math.max(0.8, mult)));
+}
+
 function generateRandomArmors() {
   const out = [];
   let idx = 0;
@@ -187,11 +261,12 @@ function generateRandomArmors() {
       for (const rarityKey in ARMOR_RARITY_CONFIG) {
         const rarity = ARMOR_RARITY_CONFIG[rarityKey];
         const armor = computeArmorValue(base.baseVal, itemLevel, base.scale, rarity.armorMult);
-        const statMods = armorAllocStats(base.armorClass, rarity.statBudget);
+        const statRoll = armorAllocStats(base.armorClass, rarity.statBudget, rarityKey);
+        const statMods = statRoll.mods;
         const avg = armor.avg;
-        const price = priceFromArmor(avg, itemLevel, rarity.armorMult);
+        const price = armorAdjustedPrice(priceFromArmor(avg, itemLevel, rarity.armorMult), statMods);
         const minShopLevel = determineArmorMinShopLevel(avg);
-        const name = buildArmorName(base.baseType, rarityKey, statMods);
+        const name = buildArmorName(base.baseType, rarityKey, statMods, statRoll.profile);
         const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
 
         out.push({
@@ -207,7 +282,10 @@ function generateRandomArmors() {
           stat: 'Armor',
           price,
           minShopLevel,
-          statMods
+          statMods,
+          affixProfile: statRoll.profile,
+          info: statRoll.profile.hasDrawback ? 'Protection comes with a sacrifice.' : undefined,
+          infoColor: statRoll.profile.hasDrawback ? 'text-red' : undefined
         });
       }
     }

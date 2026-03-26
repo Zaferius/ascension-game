@@ -1,9 +1,12 @@
--Skill tree - axe mastery - sword mastery ...   
--Büyücü itemleri büyü yapma olayı
--Shoplara UI polish(opencode biliyor)
--Trinket Shop ismi Magic Shop olarak değişir. Silahlara büyü basma yeri ve Trinket burda satılır. THE PIT Uı'ı gibi 2 kutu yanyana buton. DOT Hasarı karakterlerden cıkıp silahlara verilir bu sayede
--Blackjack oyunu daha polish olsun.
+ -Büyücü itemleri büyü yapma olayı
 -Bleed efekti durdurmak icin bandaj itemi. (Bleed cured gibi mesaj)
+-Silah türleri cok fazla. onları cıkarıp sadeleştirmek lazım.
+-Baslangıcta verilen rusty blade'e -1 charisma verilmeli
+-Combat sırasındaki log kısmında bazı loglar gelmiyor. Örnğein player health regen miktarı yazmıyor. Düsman öldüğünde onun logu da görünmüyor.
+-Victory ve Defeat ekranları UI polish
+-Multiplayer 1v1 denemeleri.
+-oyun pencere boyutu biraz artsın.
+-skill tree penceresi yarı saydam olmasın tamamen opak olsun.
 
 -perhance enemy avatar seed: //// (seed:::876714083)
 Enemy Avatar Prompt:

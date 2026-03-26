@@ -1,4 +1,4 @@
-// Config for status effects (DOT) and which enemies can apply them
+// Config for status effects (DOT) used by weapon affixes and combat
 
 const STATUS_EFFECTS_CONFIG = {
     effects: {
@@ -26,26 +26,5 @@ const STATUS_EFFECTS_CONFIG = {
             damagePct: 0.05,
             duration: 4
         }
-    },
-    // Which enemies can apply which effects and with what chance on a successful hit
-    enemies: {
-        orc: [
-            { effect: 'bleed', chance: 0.35 }
-        ],
-        goblin: [
-            { effect: 'poison', chance: 0.4 }
-        ],
-        bandit: [
-            { effect: 'bleed', chance: 0.25 }
-        ],
-        skeleton: [
-            { effect: 'bleed', chance: 0.25 }
-        ],
-        marauder: [
-            { effect: 'bleed', chance: 0.3 }
-        ],
-        paladin: [
-            { effect: 'burn', chance: 0.22 }
-        ]
     }
 };

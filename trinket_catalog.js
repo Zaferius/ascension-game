@@ -33,25 +33,33 @@ const TRINKET_RARITY_CONFIG = {
     key: 'uncommon',
     css: 'rarity-uncommon',
     statBudget: 2,
-    priceMult: 1.2
+    priceMult: 1.2,
+    drawbackChance: 0.1,
+    drawbackBudget: 1
   },
   rare: {
     key: 'rare',
     css: 'rarity-rare',
     statBudget: 4,
-    priceMult: 1.5
+    priceMult: 1.5,
+    drawbackChance: 0.22,
+    drawbackBudget: 1
   },
   epic: {
     key: 'epic',
     css: 'rarity-epic',
     statBudget: 6,
-    priceMult: 1.9
+    priceMult: 1.9,
+    drawbackChance: 0.34,
+    drawbackBudget: 2
   },
   legendary: {
     key: 'legendary',
     css: 'rarity-legendary',
     statBudget: 8,
-    priceMult: 2.5
+    priceMult: 2.5,
+    drawbackChance: 0.14,
+    drawbackBudget: 2
   }
 };
 
@@ -87,6 +95,29 @@ const TRINKET_LEGENDARY_UNIQUE_NAMES = [
   'Gloomwright’s Emblem'
 ];
 
+const TRINKET_ARCHETYPES = {
+  Balanced: [
+    { key: 'duelist', positive: ['str', 'atk', 'vit'], negative: ['def', 'mag'], drawbackLabel: 'Restless' },
+    { key: 'mercantile', positive: ['chr', 'atk', 'vit'], negative: ['def'], drawbackLabel: 'Greedy' }
+  ],
+  Offense: [
+    { key: 'glass', positive: ['atk', 'atk', 'str'], negative: ['def', 'vit'], drawbackLabel: 'Fragile' },
+    { key: 'blood', positive: ['atk', 'str', 'chr'], negative: ['mag'], drawbackLabel: 'Bloodbound' }
+  ],
+  Defense: [
+    { key: 'fortified', positive: ['def', 'vit', 'def'], negative: ['atk'], drawbackLabel: 'Heavy' },
+    { key: 'bastion', positive: ['def', 'vit', 'str'], negative: ['chr'], drawbackLabel: 'Rigid' }
+  ],
+  Mystic: [
+    { key: 'oracle', positive: ['mag', 'mag', 'chr'], negative: ['def', 'str'], drawbackLabel: 'Hollow' },
+    { key: 'hexed', positive: ['mag', 'atk', 'chr'], negative: ['vit'], drawbackLabel: 'Hexed' }
+  ],
+  Greedy: [
+    { key: 'broker', positive: ['chr', 'chr', 'atk'], negative: ['def', 'vit'], drawbackLabel: 'Shady' },
+    { key: 'fortune', positive: ['chr', 'mag', 'atk'], negative: ['str'], drawbackLabel: 'Fickle' }
+  ]
+};
+
 const TRINKET_BASE_TYPES = [
   { key: 'battle_charm', baseType: 'Charm', trinketClass: 'Balanced', baseBudget: 1 },
   { key: 'warrior_ring', baseType: 'Ring', trinketClass: 'Offense', baseBudget: 1 },
@@ -103,15 +134,32 @@ function trinketRngChoice(arr) {
   return arr[trinketRngInt(0, arr.length - 1)];
 }
 
-function trinketAllocStats(trinketClass, budget) {
-  const mods = { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
-  if (budget <= 0) return mods;
+function ensureTrinketMods() {
+  return { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
+}
+
+function trinketAllocStats(trinketClass, budget, rarityKey) {
+  const mods = ensureTrinketMods();
+  const rarity = TRINKET_RARITY_CONFIG[rarityKey] || TRINKET_RARITY_CONFIG.common;
   const weights = TRINKET_CLASS_WEIGHT_TABLE[trinketClass] || ['str', 'vit', 'atk', 'def', 'chr', 'mag'];
+  const archetypes = TRINKET_ARCHETYPES[trinketClass] || [];
+  const profile = archetypes.length ? { ...trinketRngChoice(archetypes) } : { key: 'balanced', positive: [], negative: [], drawbackLabel: '' };
   for (let i = 0; i < budget; i++) {
-    const k = weights[trinketRngInt(0, weights.length - 1)];
+    const source = profile.positive && profile.positive.length && trinketRngInt(0, 99) < 65 ? profile.positive : weights;
+    const k = source[trinketRngInt(0, source.length - 1)];
     mods[k] = (mods[k] || 0) + 1;
   }
-  return mods;
+  let hasDrawback = false;
+  const drawbackBudget = rarity.drawbackBudget || 0;
+  if (drawbackBudget > 0 && trinketRngInt(0, 999) < Math.floor((rarity.drawbackChance || 0) * 1000)) {
+    hasDrawback = true;
+    const negativePool = (profile.negative && profile.negative.length) ? profile.negative : TRINKET_STAT_KEYS.filter(k => (mods[k] || 0) <= 0);
+    for (let i = 0; i < drawbackBudget; i++) {
+      const k = negativePool[trinketRngInt(0, negativePool.length - 1)];
+      mods[k] = (mods[k] || 0) - 1;
+    }
+  }
+  return { mods, profile: { ...profile, hasDrawback } };
 }
 
 function trinketDominantStat(statMods) {
@@ -125,6 +173,21 @@ function trinketDominantStat(statMods) {
     }
   }
   return bestKey;
+}
+
+function trinketDominantNegative(statMods) {
+  const negatives = TRINKET_STAT_KEYS.filter(key => (statMods[key] || 0) < 0);
+  if (!negatives.length) return null;
+  let worstKey = negatives[0];
+  let worstVal = 0;
+  for (const key of negatives) {
+    const v = statMods[key] || 0;
+    if (v < worstVal) {
+      worstVal = v;
+      worstKey = key;
+    }
+  }
+  return worstKey;
 }
 
 function trinketPower(statMods) {
@@ -148,12 +211,16 @@ function determineTrinketMinShopLevel(power, itemLevel) {
   return 3 * (bucket - 1) + 1;
 }
 
-function buildTrinketName(baseType, rarityKey, statMods) {
+function buildTrinketName(baseType, rarityKey, statMods, profile) {
   const rarity = TRINKET_RARITY_CONFIG[rarityKey];
   const prefixPool = rarity ? ['Tarnished', 'Engraved', 'Gilded', 'Runed', 'Blessed', 'Ancient'] : [];
-  const prefix = prefixPool.length ? trinketRngChoice(prefixPool) : '';
+  let prefix = prefixPool.length ? trinketRngChoice(prefixPool) : '';
   const dom = trinketDominantStat(statMods);
   const suffix = TRINKET_STAT_SUFFIX[dom] || 'of Fortune';
+  const drawbackDom = trinketDominantNegative(statMods);
+  if (profile && profile.hasDrawback && profile.drawbackLabel && rarityKey !== 'legendary' && trinketRngInt(0, 99) < 70) {
+    prefix = `${profile.drawbackLabel} ${prefix}`.trim();
+  }
   if (rarityKey === 'legendary') {
     return trinketRngChoice(TRINKET_LEGENDARY_UNIQUE_NAMES);
   }
@@ -172,6 +239,13 @@ function priceFromTrinket(power, itemLevel, rarityPriceMult) {
   return Math.max(1, Math.round(base));
 }
 
+function trinketAdjustedPrice(price, statMods) {
+  const positive = TRINKET_STAT_KEYS.reduce((sum, key) => sum + Math.max(0, statMods[key] || 0), 0);
+  const negative = TRINKET_STAT_KEYS.reduce((sum, key) => sum + Math.abs(Math.min(0, statMods[key] || 0)), 0);
+  const mult = 1 + positive * 0.05 - negative * 0.025;
+  return Math.max(1, Math.round(price * Math.max(0.8, mult)));
+}
+
 function generateRandomTrinkets() {
   const out = [];
   let idx = 0;
@@ -180,11 +254,12 @@ function generateRandomTrinkets() {
       for (const rarityKey in TRINKET_RARITY_CONFIG) {
         const rarity = TRINKET_RARITY_CONFIG[rarityKey];
         const totalBudget = rarity.statBudget + base.baseBudget;
-        const statMods = trinketAllocStats(base.trinketClass, totalBudget);
+        const statRoll = trinketAllocStats(base.trinketClass, totalBudget, rarityKey);
+        const statMods = statRoll.mods;
         const power = trinketPower(statMods);
-        const price = priceFromTrinket(power, itemLevel, rarity.priceMult);
+        const price = trinketAdjustedPrice(priceFromTrinket(power, itemLevel, rarity.priceMult), statMods);
         const minShopLevel = determineTrinketMinShopLevel(power, itemLevel);
-        const name = buildTrinketName(base.baseType, rarityKey, statMods);
+        const name = buildTrinketName(base.baseType, rarityKey, statMods, statRoll.profile);
         const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
 
         out.push({
@@ -199,7 +274,10 @@ function generateRandomTrinkets() {
           price,
           minShopLevel,
           iconPath: 'assets/images/trinket-icons/trinket2-icon.png',
-          statMods
+          statMods,
+          affixProfile: statRoll.profile,
+          info: statRoll.profile.hasDrawback ? 'A charm that grants, then takes.' : undefined,
+          infoColor: statRoll.profile.hasDrawback ? 'text-red' : undefined
         });
       }
     }

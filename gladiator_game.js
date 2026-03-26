@@ -84,6 +84,20 @@ const STATUS_TOAST_COLORS = {
     bleed: '#ff5252'
 };
 
+const getDisplayWeaponFamily = (item) => {
+    if (typeof formatWeaponFamily === 'function') return formatWeaponFamily(item);
+    const raw = typeof item === 'string' ? item : (item?.weaponClass || item?.baseType || 'Sword');
+    return String(raw);
+};
+const getDisplayItemType = (item) => {
+    if (!item) return '';
+    if (item.type === 'weapon') return getDisplayWeaponFamily(item);
+    if (item.type === 'armor') return item.slot ? item.slot.charAt(0).toUpperCase() + item.slot.slice(1) : 'Armor';
+    if (item.type === 'trinket') return item.baseType || 'Trinket';
+    if (item.type === 'potion') return 'Potion';
+    return item.baseType || item.weaponClass || '';
+};
+
 const getArmorIconPath = (item) => {
     if (!item || item.type !== 'armor') return '';
     const slot = (item.slot || '').toLowerCase();
@@ -238,9 +252,37 @@ class Player {
         ARMOR_SLOTS.forEach(s => this.gear[s] = null);
         TRINKET_SLOTS.forEach(s => this.gear[s] = null);
         this.wins = 0; this.pts = 0;
+        this.skillPoints = 0;
+        this.skills = {};
         this.tournamentsCompleted = 0;
         // Combat potion slots: 3 configurable slots used per fight
         this.potionSlots = [null, null, null];
+    }
+    getSkillRank(id) {
+        return (this.skills && this.skills[id]) || 0;
+    }
+    getSkillEffect(key) {
+        return SKILL_TREE.reduce((sum, node) => {
+            const rank = this.getSkillRank(node.id);
+            if (!rank || !node.effects || typeof node.effects[key] !== 'number') return sum;
+            return sum + node.effects[key] * rank;
+        }, 0);
+    }
+    getWeaponFamily() {
+        return normalizeWeaponFamily(this.gear.weapon);
+    }
+    getConditionalSkillEffect(prefix) {
+        const family = this.getWeaponFamily();
+        return this.getSkillEffect(`${prefix}_${family}`);
+    }
+    getAfflictedDamageMult() {
+        return this.getSkillEffect('afflictedDamageMult');
+    }
+    getRewardMultiplierBonus() {
+        return this.getSkillEffect('rewardMult');
+    }
+    getSellMultiplierBonus() {
+        return this.getSkillEffect('sellMult');
     }
     // --- Class passives + gear stat mods helpers ---
     getGearStatBonus(key) {
@@ -262,6 +304,8 @@ class Player {
     getEffectiveAtk() {
         let a = this.stats.atk + this.getGearStatBonus('atk');
         if (this.class === 'Warrior') a += Math.floor(a / 3); // +1 ATK per 3 ATK
+        a += this.getSkillEffect('atkFlat');
+        a += this.getConditionalSkillEffect('atkWhile');
         return a;
     }
     getEffectiveVit() {
@@ -270,7 +314,7 @@ class Player {
         return v;
     }
     getEffectiveDef() {
-        return this.stats.def + this.getGearStatBonus('def');
+        return this.stats.def + this.getGearStatBonus('def') + this.getConditionalSkillEffect('defWhile');
     }
     getEffectiveMag() {
         return this.stats.mag + this.getGearStatBonus('mag');
@@ -278,17 +322,23 @@ class Player {
     getEffectiveChr() {
         return (this.stats.chr ?? 0) + this.getGearStatBonus('chr');
     }
+    getShopEffectiveChr() {
+        return this.getEffectiveChr() + this.getSkillEffect('shopChr');
+    }
     getHpMultiplier() {
         return (this.class === 'Guardian') ? 1.2 : 1.0; // +20% max HP
     }
     getArmorMultiplier() {
-        return (this.class === 'Guardian') ? 1.05 : 1.0; // +5% total armor
+        return ((this.class === 'Guardian') ? 1.05 : 1.0) + this.getSkillEffect('armorMult');
     }
     getDodgeBonus() {
-        return (this.class === 'Warrior') ? 8 : 0; // +8% dodge
+        return ((this.class === 'Warrior') ? 8 : 0) + this.getConditionalSkillEffect('dodgeWhile');
+    }
+    getHitBonus() {
+        return this.getSkillEffect('hitChance') + this.getConditionalSkillEffect('hitWhile');
     }
     getCritBonus() {
-        return (this.class === 'Beserker') ? 10 : 0; // +10% crit chance
+        return ((this.class === 'Beserker') ? 10 : 0) + this.getSkillEffect('critChance') + this.getConditionalSkillEffect('critWhile');
     }
 
     getMaxHp() {
@@ -299,9 +349,9 @@ class Player {
         const base = 12 + (extraVit * 4) + (extraLvl * 6);
         const hp = Math.floor(base * this.getHpMultiplier());
         // Daha agresif progression için toplam HP'yi 3x ölçekle
-        return Math.max(12, hp * 3);
+        return Math.max(12, hp * 3 + this.getSkillEffect('hpFlat'));
     }
-    getRegen() { return Math.floor(this.getEffectiveVit() / 2); }
+    getRegen() { return Math.floor(this.getEffectiveVit() / 2) + this.getSkillEffect('regenFlat'); }
     getTotalArmor() {
         let total = 0;
         ARMOR_SLOTS.forEach(s => { if(this.gear[s]) total += this.gear[s].val; });
@@ -311,7 +361,8 @@ class Player {
     getDmgRange() {
         const w = this.gear.weapon;
         const strBonus = this.getEffectiveStr() * 2;
-        if(w) return { min: w.min + strBonus, max: w.max + strBonus };
+        const familyMult = 1 + this.getConditionalSkillEffect('weaponDamageMult');
+        if(w) return { min: Math.max(1, Math.floor((w.min + strBonus) * familyMult)), max: Math.max(1, Math.floor((w.max + strBonus) * familyMult)) };
         return { min: 2 + strBonus, max: 4 + strBonus };
     }
     equip(item) {
@@ -528,6 +579,8 @@ const game = {
         const generateForCatalog = (catalog) => {
             const bucket = [];
             if (!Array.isArray(catalog) || catalog.length === 0) return bucket;
+            let drawbackCount = 0;
+            const drawbackCap = 5;
 
             const maxAllowedLevel = lvl + 5;
             const withinCap = catalog.filter(it => getItemMinLevel(it) <= maxAllowedLevel);
@@ -538,6 +591,7 @@ const game = {
                 const maxTries = pool.length * 3;
                 for (let i = 0; i < maxTries; i++) {
                     const cand = pool[Math.floor(Math.random() * pool.length)];
+                    if (cand.affixProfile && cand.affixProfile.hasDrawback && drawbackCount >= drawbackCap) continue;
                     if (!canUseItem(cand)) continue;
                     return cand;
                 }
@@ -550,6 +604,7 @@ const game = {
                 const inst = { ...base, id: Date.now() + Math.random() };
                 if (typeof inst.minLevel === 'number') inst.minLevel = reqLvl;
                 else inst.minShopLevel = reqLvl;
+                if (inst.affixProfile && inst.affixProfile.hasDrawback) drawbackCount++;
                 registerItem(bucket, inst);
                 return true;
             };
@@ -788,6 +843,84 @@ const game = {
     getTradeModeLabel(mode) {
         return mode === 'sell' ? 'Sell' : 'Buy';
     },
+    openSkillTree() {
+        const modal = $('modal-skilltree');
+        if (!modal || !this.player) return;
+        this.renderSkillTree();
+        modal.classList.remove('hidden');
+        if (typeof wireButtonSfx === 'function') wireButtonSfx(modal);
+    },
+    closeSkillTree() {
+        const modal = $('modal-skilltree');
+        if (modal) modal.classList.add('hidden');
+    },
+    canUnlockSkill(node) {
+        if (!this.player || !node) return false;
+        if ((this.player.skillPoints || 0) <= 0) return false;
+        const rank = this.player.getSkillRank(node.id);
+        if (rank >= (node.maxRank || 1)) return false;
+        const reqs = node.requires || [];
+        return reqs.every(id => this.player.getSkillRank(id) > 0);
+    },
+    isSkillUnlocked(node) {
+        if (!this.player || !node) return false;
+        return this.player.getSkillRank(node.id) > 0;
+    },
+    unlockSkill(skillId) {
+        if (!this.player) return;
+        const node = SKILL_TREE.find(s => s.id === skillId);
+        if (!node || !this.canUnlockSkill(node)) return;
+        this.player.skills[skillId] = (this.player.skills[skillId] || 0) + 1;
+        this.player.skillPoints -= 1;
+        this.renderSkillTree();
+        this.updateHubUI();
+        this.saveGame();
+    },
+    renderSkillTree() {
+        if (!this.player) return;
+        const pts = $('skilltree-points');
+        const host = $('skilltree-branches');
+        if (pts) pts.innerText = this.player.skillPoints || 0;
+        if (!host) return;
+        host.innerHTML = SKILL_BRANCHES.map(branch => {
+            const nodes = SKILL_TREE.filter(node => node.branch === branch.key);
+            const tierMap = new Map();
+            nodes.forEach(node => {
+                if (!tierMap.has(node.tier || 1)) tierMap.set(node.tier || 1, []);
+                tierMap.get(node.tier || 1).push(node);
+            });
+            const tierHtml = [...tierMap.entries()].sort((a,b)=>a[0]-b[0]).map(([tier, tierNodes]) => {
+                const nodeHtml = tierNodes.map(node => {
+                    const rank = this.player.getSkillRank(node.id);
+                    const unlocked = this.isSkillUnlocked(node);
+                    const canBuy = this.canUnlockSkill(node);
+                    const reqText = (node.requires && node.requires.length) ? `Requires: ${node.requires.map(id => SKILL_TREE.find(s => s.id === id)?.name || id).join(', ')}` : '';
+                    return `<button class="btn skilltree-node ${unlocked ? 'is-unlocked' : (canBuy ? 'is-available' : 'is-locked')}" onclick="game.unlockSkill('${node.id}')"><span class="skilltree-node-name">${node.name}</span><span class="skilltree-node-rank">Rank ${rank}/${node.maxRank || 1}</span><span class="skilltree-node-desc">${node.description}</span>${reqText ? `<span class="skilltree-node-req">${reqText}</span>` : ''}</button>`;
+                }).join('');
+                return `<div class="skilltree-tier"><div class="skilltree-tier-label">Tier ${tier}</div><div class="skilltree-node-list">${nodeHtml}</div></div>`;
+            }).join('');
+            return `<div class="skilltree-branch" data-branch="${branch.key}"><div class="skilltree-branch-head"><h3 class="skilltree-branch-title"><span class="skilltree-branch-icon">${branch.icon || '✦'}</span><span>${branch.name}</span></h3><div class="skilltree-branch-desc">${branch.description || ''}</div></div><div class="skilltree-tier-list">${tierHtml}</div></div>`;
+        }).join('');
+    },
+    getItemBadgeMarkup(item) {
+        if (!item) return '';
+        const parts = [];
+        if (item.dotAffix) parts.push(`<span class="item-chip item-chip-dot item-chip-dot-${item.dotAffix.effect}">${item.dotAffix.effect}</span>`);
+        return parts.join(' ');
+    },
+    getWeaponDotTooltipLine(item) {
+        if (!item || !item.dotAffix) return '';
+        const affix = item.dotAffix;
+        const scaleKeys = Object.keys(affix.scale || {}).map(k => k.toUpperCase()).join(' / ');
+        return `<div><span class="text-red">On Hit:</span> ${Math.round((affix.chance || 0) * 100)}% ${affix.effect.charAt(0).toUpperCase() + affix.effect.slice(1)} for ${affix.duration} turns</div><div style="margin-top:4px; color:#aaa; font-size:0.8rem;">Scales with ${scaleKeys || 'Weapon Power'}</div>`;
+    },
+    getAdjustedBuyPrice(item) {
+        if (!this.player || !item) return item?.price || 0;
+        const chr = this.player.getShopEffectiveChr();
+        const discount = Math.min(0.35, chr * 0.01);
+        const base = typeof item.price === 'number' ? item.price : 0;
+        return Math.max(1, Math.round(base * (1 - discount)));
+    },
     updateTradeToggleUI() {
         const btn = $('btn-trade-toggle');
         if (!btn) return;
@@ -812,14 +945,15 @@ const game = {
     },
     getSellPrice(item) {
         if (!item) return 0;
+        const sellBonus = this.player ? this.player.getSellMultiplierBonus() : 0;
         if (item.type === 'potion') {
             const def = POTION_DEFS.find(p => p.subType === item.subType && p.percent === (item.percent || 0));
             const basePrice = typeof item.price === 'number' ? item.price : (def ? Math.max(6, Math.floor(def.priceFactor * (0.75 + (this.player?.level || 1) * 0.65))) : 8);
-            return Math.max(1, Math.floor(basePrice * 0.5));
+            return Math.max(1, Math.floor(basePrice * (0.5 + sellBonus)));
         }
         const minLvl = typeof item.minLevel === 'number' ? item.minLevel : (typeof item.minShopLevel === 'number' ? item.minShopLevel : 1);
         const basePrice = typeof item.price === 'number' ? item.price : Math.max(10, minLvl * 12);
-        return Math.max(1, Math.floor(basePrice * 0.45));
+        return Math.max(1, Math.floor(basePrice * (0.45 + sellBonus)));
     },
     sellItem(item) {
         if (!this.player || !item || !Array.isArray(this.player.inventory)) return;
@@ -909,9 +1043,10 @@ const game = {
         if (!this.player || !config) return [];
         const enemyCount = config.mode === 'duo' ? 2 : 1;
         const enemyGens = [];
+        const usedNames = new Set();
         for (let i = 0; i < enemyCount; i++) {
             const lvl = i === 1 ? (config.secondaryEnemyLevel || Math.max(1, (config.enemyLevel || this.player.level) - 1)) : (config.enemyLevel || this.player.level);
-            enemyGens.push(typeof generateEnemyTemplateForLevel === 'function' ? generateEnemyTemplateForLevel(lvl) : null);
+            enemyGens.push(typeof generateEnemyTemplateForLevel === 'function' ? generateEnemyTemplateForLevel(lvl, usedNames) : null);
         }
         return enemyGens;
     },
@@ -955,11 +1090,11 @@ const game = {
             <div class="stat-row"><span>Retreat</span><span class="text-red">Disabled</span></div>
         `;
         $('tournament-roster').innerHTML = rounds.map((round, idx) => {
-            const names = (round.enemyGens || []).map(gen => gen?.template?.name || 'Bandit').join(round.mode === 'duo' ? ' + ' : '');
+            const names = (round.enemyGens || []).map(gen => gen?.displayName || gen?.template?.name || 'Bandit').join(round.mode === 'duo' ? ' + ' : '');
             return `<div class="encounter-roster-line"><div class="stat-row"><span>Round ${idx + 1}</span><span>${round.mode === 'duo' ? '1v2' : '1v1'}</span></div><div style="color:#ececef; font-size:1rem;">${names}</div><div style="color:#9898a1; font-size:0.84rem; margin-top:4px;">Level ${round.enemyLevel}${round.mode === 'duo' ? ` / ${round.secondaryEnemyLevel}` : ''}</div></div>`;
         }).join('');
         $('tournament-progress').innerHTML = rounds.map((round, idx) => {
-            const names = (round.enemyGens || []).map(gen => gen?.template?.name || 'Bandit').join(round.mode === 'duo' ? ' + ' : '');
+            const names = (round.enemyGens || []).map(gen => gen?.displayName || gen?.template?.name || 'Bandit').join(round.mode === 'duo' ? ' + ' : '');
             return `<div class="tournament-round-chip${idx === rounds.length - 1 ? ' is-final' : ''}"><strong>Round ${idx + 1}</strong><span>${names}</span></div>`;
         }).join('');
     },
@@ -969,8 +1104,8 @@ const game = {
         if (modal) modal.classList.add('hidden');
         this.prepareEncounter({ ...this.currentTournament.rounds[0], canRetreat: false });
     },
-    getEncounterEnemyPreview({ tpl, stats, lvl, mode }) {
-        const name = tpl ? tpl.name : 'Bandit';
+    getEncounterEnemyPreview({ tpl, displayName, stats, lvl, mode }) {
+        const name = displayName || (tpl ? tpl.name : 'Bandit');
         const enemy = { name, lvl, str: stats.str, atk: stats.atk, def: stats.def, vit: stats.vit };
         const maxHp = combat.getEnemyMaxHp(enemy);
         const maxArmor = mode === 'no_armor' ? 0 : Math.max(0, Math.floor(enemy.def * 1.2 + enemy.vit * 0.8 + lvl * 2));
@@ -1002,7 +1137,7 @@ const game = {
         if (closeBtn) closeBtn.style.display = cfg.canRetreat ? 'block' : 'none';
         const p = this.player;
         const dmg = p.getDmgRange();
-        const enemyPreviews = (cfg.enemyGens || []).map(gen => this.getEncounterEnemyPreview({ tpl: gen?.template, stats: gen?.stats || { str: 5, atk: 5, def: 3, vit: 3 }, lvl: gen?.level || cfg.enemyLevel || p.level, mode: cfg.mode }));
+        const enemyPreviews = (cfg.enemyGens || []).map(gen => this.getEncounterEnemyPreview({ tpl: gen?.template, displayName: gen?.displayName, stats: gen?.stats || { str: 5, atk: 5, def: 3, vit: 3 }, lvl: gen?.level || cfg.enemyLevel || p.level, mode: cfg.mode }));
         const maxEnemyHp = enemyPreviews.length ? Math.max(...enemyPreviews.map(preview => preview.maxHp)) : 0;
         const maxEnemyArmor = enemyPreviews.length ? Math.max(...enemyPreviews.map(preview => preview.maxArmor)) : 0;
         const maxEnemyDamage = enemyPreviews.length ? Math.max(...enemyPreviews.map(preview => preview.dmg.max)) : 0;
@@ -1223,12 +1358,17 @@ const game = {
             const minLvl = getItemMinLevel(item);
             let lines = [];
             lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
+            const badgeMarkup = this.getItemBadgeMarkup(item);
+            if (badgeMarkup) lines.push(`<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">${badgeMarkup}</div>`);
             if (item.type === 'weapon') {
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 if (typeof item.min === 'number' && typeof item.max === 'number') lines.push(`<div><span class="text-orange">Damage:</span> ${item.min}-${item.max}</div>`);
-                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+                const dotLine = this.getWeaponDotTooltipLine(item);
+                if (dotLine) lines.push(dotLine);
             } else if (item.type === 'armor') {
                 const val = (typeof item.val === 'number') ? item.val : 0;
                 let armorLine = `${val}`;
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 const equipped = this.player && this.player.gear && item.slot ? this.player.gear[item.slot] : null;
                 if (equipped && typeof equipped.val === 'number') {
                     const diff = val - equipped.val;
@@ -1239,9 +1379,8 @@ const game = {
                     }
                 }
                 lines.push(`<div><span class="text-shield">Armor:</span> ${armorLine}</div>`);
-                if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
             } else if (item.type === 'trinket') {
-                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
             }
             if (item.statMods) {
                 const map = [
@@ -1257,7 +1396,8 @@ const game = {
                     const v = item.statMods[key];
                     if (typeof v === 'number' && v !== 0) {
                         const sign = v > 0 ? '+' : '';
-                        modLines.push(`<div class="${cls}">${sign}${v} ${label}</div>`);
+                        const toneClass = v > 0 ? 'text-green' : 'text-red';
+                        modLines.push(`<div class="${toneClass}">${sign}${v} ${label}</div>`);
                     }
                 });
                 if (modLines.length) {
@@ -1324,7 +1464,7 @@ const game = {
         const effVit = p.getEffectiveVit();
         const effDef = p.getEffectiveDef();
         const effMag = p.getEffectiveMag();
-        const effChr = p.getEffectiveChr();
+        const effChr = p.getShopEffectiveChr();
         const strBonus = effStr - p.stats.str;
         const atkBonus = effAtk - p.stats.atk;
         const vitBonus = effVit - p.stats.vit;
@@ -1417,7 +1557,7 @@ const game = {
                 const rarityText = (trinket.rarity || '').replace('rarity-','');
                 const lines = [];
                 lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${trinket.rarity}">${trinket.name}</div>`);
-                if (trinket.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${trinket.baseType}</div>`);
+                if (trinket.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(trinket)}</div>`);
 
                 // İnsan okunur stat satırları (+1 Strength, +2 Attack, ...)
                 if (trinket.statMods) {
@@ -1504,6 +1644,8 @@ const game = {
                 if (tournamentBanner) tournamentBanner.classList.add('hidden');
             }
         }
+        const hubMsg = $('hub-msg');
+        if (hubMsg && (p.skillPoints || 0) > 0) hubMsg.innerText = `You have ${p.skillPoints} unspent skill point${p.skillPoints === 1 ? '' : 's'}.`;
         // Hub'a döndüğümüzde de shop sayaç bilgisini tazele
         this.updateShopRefreshIndicator();
     },
@@ -1615,19 +1757,7 @@ const game = {
         };
         const getItemTypeLabel = (item) => {
             if (!item) return '';
-            if (item.type === 'weapon') {
-                if (item.baseType) return item.baseType;
-                if (item.weaponClass) return item.weaponClass;
-                return 'Weapon';
-            }
-            if (item.type === 'armor') {
-                if (item.slot) return item.slot.charAt(0).toUpperCase() + item.slot.slice(1);
-                return 'Armor';
-            }
-            if (item.type === 'trinket') {
-                return 'Trinket';
-            }
-            return '';
+            return getDisplayItemType(item);
         };
         const getWeaponIconPath = (item) => {
             if (!item || item.type !== 'weapon') return '';
@@ -1661,17 +1791,21 @@ const game = {
             const minLvl = getItemMinLevel(item);
             let lines = [];
             lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
+            const badgeMarkup = this.getItemBadgeMarkup(item);
+            if (badgeMarkup) lines.push(`<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">${badgeMarkup}</div>`);
             if (item.type === 'weapon') {
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 if (typeof item.min === 'number' && typeof item.max === 'number') {
                     lines.push(`<div><span class="text-orange">Damage:</span> ${item.min}-${item.max}</div>`);
                 }
-                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+                const dotLine = this.getWeaponDotTooltipLine(item);
+                if (dotLine) lines.push(dotLine);
             } else if (item.type === 'armor') {
                 const val = (typeof item.val === 'number') ? item.val : 0;
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 lines.push(`<div><span class="text-shield">Armor:</span> ${val}</div>`);
-                if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
             } else if (item.type === 'trinket') {
-                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
             }
             if (item.statMods) {
                 const map = [
@@ -1687,7 +1821,8 @@ const game = {
                     const v = item.statMods[key];
                     if (typeof v === 'number' && v !== 0) {
                         const sign = v > 0 ? '+' : '';
-                        modLines.push(`<div class="${cls}">${sign}${v} ${label}</div>`);
+                        const toneClass = v > 0 ? 'text-green' : 'text-red';
+                        modLines.push(`<div class="${toneClass}">${sign}${v} ${label}</div>`);
                     }
                 });
                 if (modLines.length) {
@@ -1783,6 +1918,8 @@ const game = {
         const headerExtra = $('list-header-extra');
         if (!cont || !titleEl) return;
         titleEl.innerText = this.currentTradeMode === 'sell' ? 'POTION SHOP - SELL' : 'POTION SHOP';
+        const subtitleEl = $('list-title-sub');
+        if (subtitleEl) subtitleEl.innerText = this.currentTradeMode === 'sell' ? 'Trade away spare potions from your inventory.' : 'Brew room stock rotates quickly. Buy before the shelf goes dry.';
         if (headerExtra) headerExtra.innerHTML = '';
         cont.innerHTML = '';
         this.updateTradeToggleUI();
@@ -1862,15 +1999,19 @@ const game = {
             row.className = 'item-row';
             const typeLabel = tpl.subType === 'hp' ? 'Health' : 'Armor';
             const percentText = `${tpl.percent}%`;
-            const disabled = qty <= 0 || this.player.gold < price;
+            const buyPrice = this.getAdjustedBuyPrice({ price });
+            const disabled = qty <= 0 || this.player.gold < buyPrice;
             const btnState = disabled ? 'disabled' : '';
             row.innerHTML = `
-                <div class="rarity-common">${tpl.name} <span class="potion-stock-count">x ${qty}</span></div>
-                <div style="font-size:0.8rem;">Potion</div>
-                <div style="font-size:0.8rem; color:#ccc;">${typeLabel}</div>
-                <div style="font-size:0.8rem; color:#ccc;">${percentText}</div>
-                <div class="text-gold">${price}</div>
-                <button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${btnState}>Buy</button>
+                <div class="item-main">
+                    <div class="item-main-name rarity-common">${tpl.name} <span class="potion-stock-count">x ${qty}</span></div>
+                    <div class="item-main-sub">Restores ${tpl.percent}% ${typeLabel.toLowerCase()} in combat.</div>
+                </div>
+                <div><span class="item-chip">Potion</span></div>
+                <div><span class="item-chip">${typeLabel}</span></div>
+                <div class="item-level"><span class="item-chip">${percentText}</span></div>
+                <div class="item-price"><span class="text-gold">${buyPrice}</span></div>
+                <div class="item-action"><button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${btnState}>Buy</button></div>
             `;
             // Tooltip for potions in the potion shop – same layout as universal potion tooltip
             if (previewBox && previewBody) {
@@ -1908,15 +2049,15 @@ const game = {
             const btn = row.querySelector('button');
             if (btn && !disabled) {
                 btn.onclick = () => {
-                    if (entry.qty <= 0 || this.player.gold < entry.price) return;
-                    this.player.gold -= entry.price;
+                    if (entry.qty <= 0 || this.player.gold < buyPrice) return;
+                    this.player.gold -= buyPrice;
                     entry.qty -= 1;
                     this.addPotionToInventory({
                         type: 'potion',
                         subType: tpl.subType,
                         percent: tpl.percent,
                         name: tpl.name,
-                        price: entry.price,
+                        price: buyPrice,
                         rarity: 'rarity-common'
                     }, 1);
                     // Re-render potion shop row / list
@@ -1936,12 +2077,22 @@ const game = {
         if (mode === 'shop') {
             const type = this.currentShopType || 'weapon';
             let title = 'SHOP';
+            let subtitle = 'Browse this shop stock.';
             if (type === 'weapon') title = 'WEAPONSMITH';
             else if (type === 'armor') title = 'ARMOR';
-            else if (type === 'trinket') title = 'TRINKET SHOP';
+            else if (type === 'trinket') title = 'MAGIC SHOP';
             else if (type === 'potion') title = 'POTION SHOP';
             if (this.currentTradeMode === 'sell') title += ' - SELL';
             $('list-title').innerText = title;
+            const subtitleEl = $('list-title-sub');
+            if (subtitleEl) {
+                if (type === 'weapon') subtitle = 'Trade steel, compare edges, and hunt for stronger weapon rolls.';
+                else if (type === 'armor') subtitle = 'Layer protection piece by piece and read your upgrade gaps at a glance.';
+                else if (type === 'trinket') subtitle = 'Browse arcane curios, passive boons, and mystical utility pieces.';
+                else if (type === 'potion') subtitle = 'Refill field supplies and prepare for the next stretch of bloodshed.';
+                if (this.currentTradeMode === 'sell') subtitle = 'Trade away matching gear from your inventory for fast coin.';
+                subtitleEl.innerText = subtitle;
+            }
             if (header) {
                 const info = document.createElement('div');
                 info.style.color = '#888';
@@ -1951,6 +2102,8 @@ const game = {
             }
         } else {
             $('list-title').innerText = 'INVENTORY';
+            const subtitleEl = $('list-title-sub');
+            if (subtitleEl) subtitleEl.innerText = 'Inspect, compare, equip, and route consumables with less friction.';
             // Inventory filter buttons: All / Weapons / Armors / Trinkets
             const f = document.createElement('div');
             f.id = 'inv-filters';
@@ -1990,20 +2143,7 @@ const game = {
         };
         const getItemTypeLabel = (item) => {
             if (!item) return '';
-            if (item.type === 'weapon') {
-                // Always show a textual weapon type for the TYPE column
-                if (item.baseType) return item.baseType;
-                if (item.weaponClass) return item.weaponClass;
-                return 'Weapon';
-            }
-            if (item.type === 'armor') {
-                if (item.slot) return item.slot.charAt(0).toUpperCase() + item.slot.slice(1);
-                return 'Armor';
-            }
-            if (item.type === 'trinket') {
-                return 'Trinket';
-            }
-            return '';
+            return getDisplayItemType(item);
         };
         const getWeaponIconPath = (item) => {
             if (!item || item.type !== 'weapon') return '';
@@ -2038,8 +2178,11 @@ const game = {
             let lines = [];
             // Title (name)
             lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
+            const badgeMarkup = this.getItemBadgeMarkup(item);
+            if (badgeMarkup) lines.push(`<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">${badgeMarkup}</div>`);
             // Core stats
             if (item.type === 'weapon') {
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 let dmgLine = `${item.min}-${item.max}`;
                 const equipped = this.player && this.player.gear ? this.player.gear.weapon : null;
                 if (equipped && typeof equipped.min === 'number' && typeof equipped.max === 'number') {
@@ -2053,10 +2196,12 @@ const game = {
                     }
                 }
                 lines.push(`<div><span class="text-orange">Damage:</span> ${dmgLine}</div>`);
-                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+                const dotLine = this.getWeaponDotTooltipLine(item);
+                if (dotLine) lines.push(dotLine);
             } else if (item.type === 'armor') {
                 const val = (typeof item.val === 'number') ? item.val : 0;
                 let armorLine = `${val}`;
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 const equipped = this.player && this.player.gear && item.slot ? this.player.gear[item.slot] : null;
                 if (equipped && typeof equipped.val === 'number') {
                     const diff = val - equipped.val;
@@ -2067,9 +2212,8 @@ const game = {
                     }
                 }
                 lines.push(`<div><span class="text-shield">Armor:</span> ${armorLine}</div>`);
-                if (item.slot) lines.push(`<div><span class="text-blue">Slot:</span> ${item.slot}</div>`);
             } else if (item.type === 'trinket') {
-                if (item.baseType) lines.push(`<div><span class="text-blue">Type:</span> ${item.baseType}</div>`);
+                lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
             } else if (item.type === 'potion') {
                 const typeLabel = item.subType === 'armor' ? 'Armor' : 'Health';
                 const pct = item.percent || 0;
@@ -2091,7 +2235,8 @@ const game = {
                     const v = item.statMods[key];
                     if (typeof v === 'number' && v !== 0) {
                         const sign = v > 0 ? '+' : '';
-                        modLines.push(`<div class="${cls}">${sign}${v} ${label}</div>`);
+                        const toneClass = v > 0 ? 'text-green' : 'text-red';
+                        modLines.push(`<div class="${toneClass}">${sign}${v} ${label}</div>`);
                     }
                 });
                 if (modLines.length) {
@@ -2169,15 +2314,20 @@ const game = {
                     if (parts.length) nameSuffix = ` <span style="color:#666; font-size:0.75rem;">${parts.join(' ')}</span>`;
                 }
                 const typeLabel = getItemTypeLabel(equipped);
+                const badgeMarkup = this.getItemBadgeMarkup(equipped);
                 const row = document.createElement('div');
                 row.className = 'item-row';
                 row.innerHTML = `
-                    <div class="${equipped.rarity}">${baseName}${nameSuffix}</div>
-                    <div style="font-size:0.8rem;">${equipped.rarity.replace('rarity-','')}</div>
-                    <div style="font-size:0.8rem; color:#ccc;">${typeLabel}</div>
-                    <div style="font-size:0.8rem; color:#ccc;">-</div>
-                    <div class="text-gold">-</div>
-                    <button class="btn" style="padding:5px 10px; font-size:0.8rem;">Unequip</button>`;
+                    <div class="item-main">
+                        <div class="item-main-name ${equipped.rarity}">${baseName}${nameSuffix}</div>
+                        ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
+                        <div class="item-main-sub">Equipped in ${title}${isWeapon ? ` • ${equipped.min}-${equipped.max} damage` : equipped.type === 'armor' ? ` • ${equipped.val} armor` : ''}</div>
+                    </div>
+                    <div><span class="item-chip">${equipped.rarity.replace('rarity-','')}</span></div>
+                    <div><span class="item-chip">${getDisplayItemType(equipped)}</span></div>
+                    <div class="item-level"><span class="item-chip">Equipped</span></div>
+                    <div class="item-price"><span class="item-chip">-</span></div>
+                    <div class="item-action"><button class="btn" style="padding:5px 10px; font-size:0.8rem;">Unequip</button></div>`;
                 row.querySelector('button').onclick = () => {
                     this.doUnequip(slot);
                     this.renderList(this.player.inventory, mode);
@@ -2228,6 +2378,7 @@ const game = {
                 const diff = item.max - curMax;
                 diffHtml = diff > 0 ? `<span class="diff-pos">(+${diff})</span>` : (diff < 0 ? `<span class="diff-neg">(${diff})</span>` : '');
                 statDisplay = `Dmg: ${item.min}-${item.max}`;
+                if (item.dotAffix) statDisplay += ` • ${Math.round((item.dotAffix.chance || 0) * 100)}% ${item.dotAffix.effect}`;
             } else if (item.type === 'armor') {
                 const current = this.player.gear[item.slot];
                 const curVal = current ? current.val : 0;
@@ -2263,11 +2414,11 @@ const game = {
             if (mode === 'shop') btnTxt = this.currentTradeMode === 'sell' ? 'Sell' : 'Buy';
             else if (item.type === 'potion') btnTxt = 'Equip';
             else btnTxt = 'Equip';
-            const tradePrice = mode === 'shop' ? (this.currentTradeMode === 'sell' ? this.getSellPrice(item) : item.price) : '-';
+            const tradePrice = mode === 'shop' ? (this.currentTradeMode === 'sell' ? this.getSellPrice(item) : this.getAdjustedBuyPrice(item)) : '-';
             const priceTxt = mode === 'shop' ? `${tradePrice}` : '-';
             let btnState = "";
             if (mode === 'shop') {
-                if (this.currentTradeMode === 'buy' && (!lvlOk || this.player.gold < item.price)) btnState = "disabled";
+                if (this.currentTradeMode === 'buy' && (!lvlOk || this.player.gold < tradePrice)) btnState = "disabled";
             }
             const btnClass = mode === 'shop' ? 'btn btn-buy' : 'btn';
 
@@ -2275,14 +2426,19 @@ const game = {
 
             const lvlColor = lvlOk ? '#ccc' : '#f44336';
             const lvlHtml = `<span style="color:${lvlColor};">${minLvl}</span>`;
+            const badgeMarkup = this.getItemBadgeMarkup(item);
 
             div.innerHTML = `
-                <div class="${item.rarity}">${nameHtml}</div>
-                <div style="font-size:0.8rem;">${item.rarity.replace('rarity-','')}</div>
-                <div style="font-size:0.8rem; color:#ccc;">${typeLabel}</div>
-                <div style="font-size:0.8rem; color:${lvlColor};">${lvlHtml}</div>
-                <div class="text-gold">${priceTxt}</div>
-                <button class="${btnClass}" style="padding:5px 10px; font-size:0.8rem;" ${btnState}>${btnTxt}</button>
+                <div class="item-main">
+                    <div class="item-main-name ${item.rarity}">${nameHtml}</div>
+                    ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
+                    <div class="item-main-sub">${statDisplay}${diffHtml}</div>
+                </div>
+                <div><span class="item-chip">${item.rarity.replace('rarity-','')}</span></div>
+                <div><span class="item-chip">${getDisplayItemType(item)}</span></div>
+                <div class="item-level"><span class="item-chip" style="color:${lvlColor};">Lvl ${minLvl}</span></div>
+                <div class="item-price"><span class="text-gold">${priceTxt}</span></div>
+                <div class="item-action"><button class="${btnClass}" style="padding:5px 10px; font-size:0.8rem;" ${btnState}>${btnTxt}</button></div>
             `;
 
             // Hover tooltip for all items (shop or inventory)
@@ -2307,8 +2463,8 @@ const game = {
                         this.sellItem(item);
                         return;
                     }
-                    if(this.player.gold >= item.price) {
-                        this.player.gold -= item.price;
+                    if(this.player.gold >= tradePrice) {
+                        this.player.gold -= tradePrice;
                         // Auto-equip if corresponding slot is empty
                         const p = this.player;
                         let autoEquipped = false;
@@ -2485,6 +2641,8 @@ const game = {
         const avatarIdx = Math.max(0, AVATARS.indexOf(plain.avatar));
         this.player = new Player(plain.name, plain.class, avatarIdx >= 0 ? avatarIdx : 0);
         Object.assign(this.player, plain);
+        if (!this.player.skills) this.player.skills = {};
+        if (typeof this.player.skillPoints !== 'number') this.player.skillPoints = 0;
 
         // Normalize potionSlots for older saves / bad data
         if (!Array.isArray(this.player.potionSlots)) {
@@ -2504,16 +2662,28 @@ const game = {
             // Base type kelimesini isimden çıkar
             item.name = cleanLegendaryWeaponName(item);
         };
+        const fixStarterRustyBlade = (item) => {
+            if (!item || item.type !== 'weapon') return;
+            const key = String(item.key || '').toLowerCase();
+            const name = String(item.name || '').toLowerCase();
+            if (key !== 'rusty_blade' && key !== 'rusty_sword' && name !== 'rusty blade' && name !== 'rusty sword') return;
+            if (!item.statMods || typeof item.statMods !== 'object') item.statMods = {};
+            if (typeof item.statMods.chr !== 'number') item.statMods.chr = -1;
+        };
 
         // Gear
         if(this.player.gear) {
             Object.keys(this.player.gear).forEach(slot => {
                 fixLegendaryItemName(this.player.gear[slot]);
+                fixStarterRustyBlade(this.player.gear[slot]);
             });
         }
         // Inventory
         if(Array.isArray(this.player.inventory)) {
-            this.player.inventory.forEach(it => fixLegendaryItemName(it));
+            this.player.inventory.forEach(it => {
+                fixLegendaryItemName(it);
+                fixStarterRustyBlade(it);
+            });
         }
 
         // Shop state'ini kayıttan geri yükle (yoksa defaultla)
@@ -2863,6 +3033,7 @@ const game = {
             c.appendChild(d);
         }); 
         $('lvl-pts').innerText = this.player.pts; 
+        const skillPts = $('lvl-skill-pts'); if (skillPts) skillPts.innerText = this.player.skillPoints || 0;
         const btn=$('btn-lvl-confirm');
         btn.disabled = (this.player.pts !== 0);
     },
@@ -2935,15 +3106,16 @@ const game = {
     closeVictory() {
         $('modal-victory').classList.add('hidden');
         $('vic-xp-bar').style.width='0%';
-        if (this.currentTournament && this.currentTournament.index < this.currentTournament.rounds.length - 1) {
-            this.currentTournament.index += 1;
-            this.prepareEncounter(this.currentTournament.rounds[this.currentTournament.index]);
-            return;
-        }
+            if (this.currentTournament && this.currentTournament.index < this.currentTournament.rounds.length - 1) {
+                this.currentTournament.index += 1;
+                this.prepareEncounter(this.currentTournament.rounds[this.currentTournament.index]);
+                return;
+            }
         if((this.player.level || 1) < 100 && this.player.xp >= this.player.xpMax) {
             this.player.xp -= this.player.xpMax;
             this.player.xpMax=Math.floor(this.player.xpMax*1.5);
             this.player.level = Math.min(100, (this.player.level || 1) + 1);
+            this.player.skillPoints = (this.player.skillPoints || 0) + 1;
             this.triggerLevelUp();
         } else {
             if ((this.player.level || 1) >= 100) this.player.xp = Math.min(this.player.xp, this.player.xpMax);
@@ -2955,6 +3127,10 @@ const game = {
 // --- BLACKJACK ---
 const blackjack = {
     deck: [], playerHand: [], dealerHand: [], bet: 0, active: false,
+    updateBetUI() {
+        const total = $('bj-bet-total');
+        if (total) total.innerText = this.bet;
+    },
     open() {
         // fully reset state each time we open blackjack
         this.deck = [];
@@ -2973,15 +3149,30 @@ const blackjack = {
         $('player-score').innerText = '';
         $('dealer-score').innerText = '';
         $('bj-gold').innerText = game.player.gold;
+        this.updateBetUI();
         const res = $('bj-result-overlay'); if(res) res.classList.add('hidden');
     },
     close() { $('modal-gamble').classList.add('hidden'); game.updateHubUI(); }, 
+    addBet(amount) {
+        if (!game.player) return;
+        this.bet = Math.min(game.player.gold, Math.max(0, this.bet + amount));
+        this.updateBetUI();
+    },
+    clearBet() {
+        this.bet = 0;
+        this.updateBetUI();
+    },
+    maxBet() {
+        if (!game.player) return;
+        this.bet = Math.max(0, game.player.gold);
+        this.updateBetUI();
+    },
     
     createDeck() { const s=['♠','♥','♣','♦'], v=['2','3','4','5','6','7','8','9','10','J','Q','K','A']; this.deck=[]; s.forEach(st=>v.forEach(vl=>this.deck.push({suit:st, val:vl}))); this.deck.sort(()=>Math.random()-0.5); },
     getVal(c) { if(['J','Q','K'].includes(c.val))return 10; if(c.val==='A')return 11; return parseInt(c.val); },
     calc(hand) { let sum=0, aces=0; hand.forEach(c=>{ sum+=this.getVal(c); if(c.val==='A')aces++; }); while(sum>21 && aces>0){sum-=10; aces--;} return sum; },
     deal() {
-        const b = parseInt($('bj-bet').value); if(isNaN(b) || b<=0 || b>game.player.gold) { alert("Invalid bet"); return; }
+        const b = this.bet; if(isNaN(b) || b<=0 || b>game.player.gold) { alert("Invalid bet"); return; }
         this.bet = b; game.player.gold -= b; $('bj-gold').innerText = game.player.gold;
         this.createDeck(); this.playerHand=[this.deck.pop(), this.deck.pop()]; this.dealerHand=[this.deck.pop(), this.deck.pop()];
         this.active = true;
@@ -3142,7 +3333,7 @@ const combat = {
         const tpl = enemyGen ? enemyGen.template : null;
         const eStats = enemyGen ? enemyGen.stats : { str: 5, atk: 5, def: 3, vit: 3 };
         const s = enemyGen ? enemyGen.level : p.level;
-        const enemyName = tpl ? tpl.name : 'Bandit';
+        const enemyName = (enemyGen && enemyGen.displayName) ? enemyGen.displayName : (tpl ? tpl.name : 'Bandit');
         const enemy = {
             name: enemyName,
             templateKey: tpl && tpl.key ? tpl.key : String(enemyName || '').toLowerCase(),
@@ -3155,7 +3346,9 @@ const combat = {
             vit: eStats.vit,
             mag: 0,
             armor: 0,
-            maxArmor: 0
+            maxArmor: 0,
+            dots: [],
+            dotResist: {}
         };
         let desiredClass = (tpl && tpl.weaponClass) ? tpl.weaponClass : 'Sword';
         let enemyWeapon = null;
@@ -3395,7 +3588,7 @@ const combat = {
         const nameEl = $('ins-weapon-name');
         const rangeEl = $('ins-weapon-range');
         if (w) {
-            if (nameEl) nameEl.innerText = w.name || (w.baseType || 'Weapon');
+            if (nameEl) nameEl.innerText = w.name || getDisplayWeaponFamily(w) || 'Weapon';
             // Inspect Damage Range: STR bonuslu efektif aralığı göster
             if (rangeEl) {
                 const erange = this.getEnemyDmgRange(e);
@@ -3413,13 +3606,11 @@ const combat = {
                     let lines = [];
                     const rarityText = (w.rarity || '').replace('rarity-','');
                     const minLvl = (typeof w.minLevel === 'number') ? w.minLevel : (typeof w.minShopLevel === 'number' ? w.minShopLevel : 1);
-                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${w.rarity || ''}">${w.name || (w.baseType || 'Weapon')}</div>`);
+                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${w.rarity || ''}">${w.name || getDisplayWeaponFamily(w) || 'Weapon'}</div>`);
                     if (typeof w.min === 'number' && typeof w.max === 'number') {
                         lines.push(`<div><span class="text-orange">Damage:</span> ${w.min}-${w.max}</div>`);
                     }
-                    if (w.baseType) {
-                        lines.push(`<div><span class="text-blue">Type:</span> ${w.baseType}</div>`);
-                    }
+                    lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(w)}</div>`);
                     if (w.statMods) {
                         const map = [
                             { key: 'str', label: 'Strength', cls: 'text-orange' },
@@ -3527,7 +3718,7 @@ const combat = {
         }
 
         if (w) {
-            if (nameEl) nameEl.innerText = w.name || (w.baseType || 'Weapon');
+            if (nameEl) nameEl.innerText = w.name || getDisplayWeaponFamily(w) || 'Weapon';
 
             // Player silahı için de basit tooltip kullan
             if (nameEl) {
@@ -3539,13 +3730,11 @@ const combat = {
                     let lines = [];
                     const rarityText = (w.rarity || '').replace('rarity-','');
                     const minLvl = (typeof w.minLevel === 'number') ? w.minLevel : (typeof w.minShopLevel === 'number' ? w.minShopLevel : 1);
-                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${w.rarity || ''}">${w.name || (w.baseType || 'Weapon')}</div>`);
+                    lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${w.rarity || ''}">${w.name || getDisplayWeaponFamily(w) || 'Weapon'}</div>`);
                     if (typeof w.min === 'number' && typeof w.max === 'number') {
                         lines.push(`<div><span class="text-orange">Damage:</span> ${w.min}-${w.max}</div>`);
                     }
-                    if (w.baseType) {
-                        lines.push(`<div><span class="text-blue">Type:</span> ${w.baseType}</div>`);
-                    }
+                    lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(w)}</div>`);
                     if (w.statMods) {
                         const map = [
                             { key: 'str', label: 'Strength', cls: 'text-orange' },
@@ -3759,6 +3948,23 @@ const combat = {
             const enemy2Cross = $('enemy2-death-cross');
             if (enemy2Cross && e2.hp <= 0) enemy2Cross.classList.add('enemy-death-cross-anim');
         }
+        const renderEnemyDots = (enemy, elId) => {
+            const el = $(elId);
+            if (!el) return;
+            if (!enemy || !enemy.dots || enemy.dots.length === 0) {
+                el.innerHTML = '';
+                return;
+            }
+            el.innerHTML = enemy.dots.map(dot => {
+                const cfg = (typeof STATUS_EFFECTS_CONFIG !== 'undefined' && STATUS_EFFECTS_CONFIG.effects[dot.id]) ? STATUS_EFFECTS_CONFIG.effects[dot.id] : null;
+                const icon = cfg ? cfg.icon : '●';
+                const label = cfg ? cfg.label : dot.id;
+                const color = cfg ? cfg.color : '#fff';
+                return `<span class="status-badge" style="color:${color};">${icon} ${label} (${dot.remaining})</span>`;
+            }).join(' ');
+        };
+        renderEnemyDots(e1, 'enemy-status-icons');
+        renderEnemyDots(e2, 'enemy2-status-icons');
         const p = game.player;
         const nameEl = $('c-player-name-text');
         const lvlEl = $('c-player-lvl');
@@ -3810,7 +4016,7 @@ const combat = {
                 ? this.enemies[this.hoverTargetIndex]
                 : (!this.targetSelectionActive ? activeTarget : null);
             if (previewEnemy) {
-                const hit = this.calcHit(game.player.getEffectiveAtk(), previewEnemy.def);
+                const hit = this.calcHit(game.player.getEffectiveAtk(), previewEnemy.def) + game.player.getHitBonus();
                 const q = Math.max(5, Math.min(99, hit + 18));
                 const n = Math.max(5, Math.min(99, hit));
                 const p = Math.max(5, Math.min(99, hit - 12));
@@ -3891,35 +4097,59 @@ const combat = {
         }
         return { hitBonus: 0, damageMult: 1, shake: 'shake-md', blur: 'combat-blur-md', impactDuration: 380, hitStopMs: 58, particleColor: 'rgba(255,236,179,0.95)', slashColor: 'rgba(255,255,255,0.9)', impactSize: 230 };
     },
-    getEnemyDotEffects() {
-        if (typeof STATUS_EFFECTS_CONFIG === 'undefined' || !this.enemy) return [];
-        const key = String(this.enemy.templateKey || this.enemy.name || '').trim().toLowerCase();
-        if (!key) return [];
-        const effects = STATUS_EFFECTS_CONFIG.enemies[key];
-        return Array.isArray(effects) ? effects : [];
-    },
-    applyEnemyOnHitEffects() {
-        const effects = this.getEnemyDotEffects();
-        if (!effects.length || this.hp <= 0) return;
-        effects.forEach(entry => {
-            if (!entry || !entry.effect) return;
-            const resist = this.dotResist[entry.effect] || 0;
-            const finalChance = Math.max(0, (entry.chance || 0) * (1 - resist));
-            if ((rng(0, 100) / 100) > finalChance) return;
-            const alreadyHadEffect = !!(this.playerDots && this.playerDots.some(dot => dot.id === entry.effect));
-            this.applyDot(entry.effect);
-            const cfg = STATUS_EFFECTS_CONFIG.effects[entry.effect];
-            const label = cfg ? cfg.label : entry.effect;
-            const icon = cfg ? cfg.icon : '!';
-            if (alreadyHadEffect) {
-                this.logMessage(`${this.enemy.name} refreshes <span class="log-status">${label}</span> on you.`);
-                this.showCombatToast(`${icon} ${label} refreshed`, 'status', entry.effect);
-            } else {
-                this.logMessage(`${this.enemy.name} inflicts <span class="log-status">${label}</span> on you.`);
-                this.showCombatToast(`${icon} ${label}`, 'status', entry.effect);
+    computeDotDamageFromAffix(affix, attacker) {
+        if (!affix) return 0;
+        let total = affix.baseDamage || 0;
+        const scale = affix.scale || {};
+        const getStat = (key) => {
+            if (attacker instanceof Player) {
+                if (key === 'str') return attacker.getEffectiveStr();
+                if (key === 'atk') return attacker.getEffectiveAtk();
+                if (key === 'def') return attacker.getEffectiveDef();
+                if (key === 'vit') return attacker.getEffectiveVit();
+                if (key === 'mag') return attacker.getEffectiveMag();
+                if (key === 'chr') return attacker.getEffectiveChr();
+                return 0;
             }
-            this.burstAvatarFx(entry.effect);
+            return attacker && typeof attacker[key] === 'number' ? attacker[key] : 0;
+        };
+        Object.keys(scale).forEach(key => {
+            total += getStat(key) * scale[key];
         });
+        return Math.max(1, Math.floor(total));
+    },
+    applyWeaponOnHitEffects(attacker, weapon, targetType, enemyIndex = null) {
+        if (typeof STATUS_EFFECTS_CONFIG === 'undefined' || !weapon || !weapon.dotAffix) return;
+        const affix = weapon.dotAffix;
+        const effectId = affix.effect;
+        if (!effectId || !STATUS_EFFECTS_CONFIG.effects[effectId]) return;
+        const bonusChance = attacker instanceof Player ? attacker.getSkillEffect(`dotChance_${effectId}`) : 0;
+        const finalChance = Math.min(0.95, (affix.chance || 0) + bonusChance);
+        if ((rng(0, 100) / 100) > finalChance) return;
+        const bonusDamage = attacker instanceof Player ? attacker.getSkillEffect(`dotDamage_${effectId}`) : 0;
+        const damage = this.computeDotDamageFromAffix(affix, attacker) + bonusDamage;
+        const duration = affix.duration || STATUS_EFFECTS_CONFIG.effects[effectId].duration;
+        const sourceName = attacker instanceof Player ? (weapon.name || attacker.name) : (weapon.name || attacker.name || 'Enemy weapon');
+        if (targetType === 'player') {
+            const alreadyHadEffect = !!(this.playerDots && this.playerDots.some(dot => dot.id === effectId));
+            this.applyDotToPlayer(effectId, damage, duration, sourceName);
+            const cfg = STATUS_EFFECTS_CONFIG.effects[effectId];
+            const label = cfg ? cfg.label : effectId;
+            const icon = cfg ? cfg.icon : '!';
+            this.logMessage(`${attacker.name} inflicts <span class="log-status">${label}</span> on you.`);
+            this.showCombatToast(`${icon} ${label}${alreadyHadEffect ? ' refreshed' : ''}`, 'status', effectId);
+            this.burstAvatarFx(effectId);
+        } else if (targetType === 'enemy') {
+            const idx = typeof enemyIndex === 'number' ? enemyIndex : this.activeEnemyIndex;
+            const targetEnemy = this.enemies[idx];
+            if (!targetEnemy || targetEnemy.hp <= 0) return;
+            const alreadyHadEffect = !!(targetEnemy.dots && targetEnemy.dots.some(dot => dot.id === effectId));
+            this.applyDotToEnemy(idx, effectId, damage, duration, sourceName);
+            const cfg = STATUS_EFFECTS_CONFIG.effects[effectId];
+            const label = cfg ? cfg.label : effectId;
+            this.logMessage(`Your weapon inflicts <span class="log-status">${label}</span> on ${targetEnemy.name}.`);
+            this.showCombatToast(`${cfg ? cfg.icon : '!'} ${label}${alreadyHadEffect ? ' refreshed' : ''}`, 'status', effectId);
+        }
     },
     setTurn(who) {
         this.turn = who; const ind = $('turn-indicator'); const acts = $('combat-actions');
@@ -3940,8 +4170,12 @@ const combat = {
                 // DOT'tan öldüyse, yenilgi ekranı içinde zaten tur biter, buton açma
                 if (diedFromDot || this.hp <= 0) return;
 
+                const regenAmount = game.player.getRegen();
                 if(this.hp < this.maxHp) {
-                    this.hp = Math.min(this.maxHp, this.hp + game.player.getRegen());
+                    const before = this.hp;
+                    this.hp = Math.min(this.maxHp, this.hp + regenAmount);
+                    const actual = this.hp - before;
+                    if (actual > 0) this.logMessage(`You regenerate <span class="log-heal">${actual}</span> HP.`);
                 }
                 this.updateUI();
 
@@ -3951,6 +4185,8 @@ const combat = {
             }, delay);
         } else {
             ind.innerText = "ENEMY TURN"; ind.className = "text-red"; acts.style.opacity = '0.5'; acts.style.pointerEvents = 'none';
+
+            if (this.applyEnemyDotTicks()) return;
 
             // Düşman turu başında, Vitality statına göre can yenilesin
             this.getLivingEnemies().forEach(e => {
@@ -3968,15 +4204,32 @@ const combat = {
             this.runEnemyTurn();
         }
     },
-    applyDot(dotId) {
+    applyDotToPlayer(dotId, damage, duration, sourceName = '') {
         if(typeof STATUS_EFFECTS_CONFIG === 'undefined') return;
         const cfg = STATUS_EFFECTS_CONFIG.effects[dotId];
         if(!cfg) return;
         const existing = this.playerDots.find(d => d.id === dotId);
         if(existing) {
-            existing.remaining = cfg.duration;
+            existing.remaining = duration || cfg.duration;
+            existing.damage = damage;
+            existing.source = sourceName;
         } else {
-            this.playerDots.push({ id: dotId, remaining: cfg.duration });
+            this.playerDots.push({ id: dotId, remaining: duration || cfg.duration, damage, source: sourceName });
+        }
+    },
+    applyDotToEnemy(enemyIndex, dotId, damage, duration, sourceName = '') {
+        if(typeof STATUS_EFFECTS_CONFIG === 'undefined') return;
+        const cfg = STATUS_EFFECTS_CONFIG.effects[dotId];
+        const enemy = this.enemies[enemyIndex];
+        if (!cfg || !enemy) return;
+        if (!Array.isArray(enemy.dots)) enemy.dots = [];
+        const existing = enemy.dots.find(d => d.id === dotId);
+        if (existing) {
+            existing.remaining = duration || cfg.duration;
+            existing.damage = damage;
+            existing.source = sourceName;
+        } else {
+            enemy.dots.push({ id: dotId, remaining: duration || cfg.duration, damage, source: sourceName });
         }
     },
     applyDotTick() {
@@ -3990,8 +4243,7 @@ const combat = {
         this.playerDots.forEach(dot => {
             const cfg = STATUS_EFFECTS_CONFIG.effects[dot.id];
             if(!cfg) return;
-            const raw = Math.floor(this.maxHp * cfg.damagePct);
-            const dmg = Math.max(1, raw);
+            const dmg = Math.max(1, dot.damage || Math.floor(this.maxHp * cfg.damagePct));
             totalDmg += dmg;
             if (dot.id === 'poison') hasPoison = true;
             if (dot.id === 'burn') hasBurn = true;
@@ -4013,13 +4265,6 @@ const combat = {
             // Aktif DOT tiplerine göre renkli vignette göster
             this.flashDotVignette({ hasPoison, hasBurn, hasBleed });
             this.showDmg(totalDmg, 'player', 'dot');
-            this.spawnImpactParticles({
-                x: this.getImpactPoint().x - 220,
-                y: this.getImpactPoint().y + 120,
-                particleColor: hasBurn ? 'rgba(255,145,0,0.92)' : (hasPoison ? 'rgba(118,255,3,0.92)' : 'rgba(255,82,82,0.92)'),
-                slashCount: 0,
-                particleCount: 5
-            });
             this.logMessage(`Damage over time effects deal <span class="log-dmg">${totalDmg}</span> damage to you.`);
             // DOT'tan ölme durumu: HP barı sıfırlandığı anda death cross + gecikmeli defeat ekranı
             if(this.hp <= 0) {
@@ -4028,6 +4273,44 @@ const combat = {
             }
         }
         return false;
+    },
+    applyEnemyDotTicks() {
+        if (typeof STATUS_EFFECTS_CONFIG === 'undefined') return false;
+        let someoneDied = false;
+        this.getLivingEnemies().forEach(enemy => {
+            if (!enemy.dots || enemy.dots.length === 0 || enemy.hp <= 0) return;
+            let totalDmg = 0;
+            const nextDots = [];
+            enemy.dots.forEach(dot => {
+                const cfg = STATUS_EFFECTS_CONFIG.effects[dot.id];
+                if (!cfg) return;
+                const dmg = Math.max(1, dot.damage || Math.floor(enemy.maxHp * cfg.damagePct));
+                totalDmg += dmg;
+                dot.remaining -= 1;
+                if (dot.remaining > 0) nextDots.push(dot);
+                else {
+                    const prev = enemy.dotResist[dot.id] || 0;
+                    enemy.dotResist[dot.id] = Math.min(0.9, prev + 0.4);
+                }
+            });
+            enemy.dots = nextDots;
+            if (totalDmg > 0) {
+                const savedIndex = this.activeEnemyIndex;
+                this.activeEnemyIndex = this.enemies.indexOf(enemy);
+                this.syncActiveEnemy();
+                this.takeDamage(totalDmg, 'enemy');
+                this.logMessage(`${enemy.name} suffers <span class="log-dmg">${totalDmg}</span> DOT damage.`);
+                if (enemy.hp <= 0) this.logMessage(`${enemy.name} collapses from the affliction.`);
+                this.activeEnemyIndex = savedIndex;
+                if (enemy.hp <= 0) someoneDied = true;
+            }
+        });
+        this.syncActiveEnemy();
+        if (this.getLivingEnemies().length === 0) {
+            this.win();
+            return true;
+        }
+        return someoneDied;
     },
     takeDamage(amount, target) {
         if(target === 'player') {
@@ -4092,14 +4375,6 @@ const combat = {
         c.classList.add(shakeClass);
         c.classList.add('hit-impact');
         if (combatScreen && blurClass) combatScreen.classList.add(blurClass);
-        this.spawnImpactParticles({
-            x: impactPoint.x,
-            y: impactPoint.y,
-            particleColor: options.particleColor,
-            slashColor: options.slashColor,
-            particleCount: options.particleCount,
-            slashCount: options.slashCount
-        });
         setTimeout(() => {
             c.classList.remove(shakeClass);
             c.classList.remove('hit-impact');
@@ -4268,6 +4543,7 @@ const combat = {
             }
             const profile = this.getPlayerAttackProfile(type);
             let hit = this.calcHit(p.getEffectiveAtk(), e.def);
+            hit += p.getHitBonus();
             const effectiveHit = Math.max(5, Math.min(99, hit + profile.hitBonus));
             const roll = rng(0,100);
             const didHit = roll <= effectiveHit;
@@ -4278,6 +4554,9 @@ const combat = {
                         const range = p.getDmgRange();
                         const baseDmg = rng(range.min, range.max);
                         let dmg = Math.floor(baseDmg * profile.damageMult);
+                        const targetEnemy = this.syncActiveEnemy();
+                        const hasAffliction = !!(targetEnemy && Array.isArray(targetEnemy.dots) && targetEnemy.dots.length > 0);
+                        if (hasAffliction) dmg = Math.floor(dmg * (1 + p.getAfflictedDamageMult()));
                         const critChance = 5 + p.getEffectiveAtk() + p.getCritBonus();
                         let isCrit = false;
                         let isDisastrous = false;
@@ -4297,8 +4576,16 @@ const combat = {
                                 dmg = Math.floor(dmg * 1.5);
                             }
                         }
-                        const targetEnemy = this.syncActiveEnemy();
+                        const shred = p.getConditionalSkillEffect('armorShredWhile');
+                        if (targetEnemy && shred > 0 && targetEnemy.armor > 0) {
+                            const shredAmt = Math.max(0, Math.floor(targetEnemy.armor * shred));
+                            if (shredAmt > 0) {
+                                targetEnemy.armor = Math.max(0, targetEnemy.armor - shredAmt);
+                                this.logMessage(`Armor shatters for <span class="log-dmg">${shredAmt}</span>.`);
+                            }
+                        }
                         this.takeDamage(dmg, 'enemy');
+                        this.applyWeaponOnHitEffects(p, p.gear.weapon, 'enemy', this.activeEnemyIndex);
                         this.showDmg(dmg, 'enemy', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
                         const label = type==='quick' ? 'Quick' : (type==='power' ? 'Power' : 'Normal');
                         let critText = '';
@@ -4320,6 +4607,7 @@ const combat = {
                         if (isCrit) this.showCombatToast('CRITICAL', 'status');
                         if (isDisastrous) this.showCombatToast('DISASTROUS', 'status');
                         if (targetEnemy.hp <= 0) {
+                            this.logMessage(`${targetEnemy.name} falls in the arena.`);
                             this.flashFinisher(isDisastrous ? 'disastrous' : 'kill');
                             const defeatedIndex = this.enemies.indexOf(targetEnemy);
                             const cross = defeatedIndex === 1 ? $('enemy2-death-cross') : $('enemy-death-cross');
@@ -4331,7 +4619,7 @@ const combat = {
                             this.syncActiveEnemy();
                         }
                     } else {
-                        this.showDmg("DODGE", 'enemy', 'miss');
+                        this.showDmg(Math.random() < 0.5 ? 'DODGE' : 'MISS', 'enemy', 'miss');
                         this.logMessage(`Your attack misses ${e.name}.`);
                     }
                     this.updateUI();
@@ -4393,7 +4681,7 @@ const combat = {
                                 dmg = Math.floor(dmg * 1.5);
                             }
                             this.takeDamage(dmg, 'player');
-                            this.applyEnemyOnHitEffects();
+                            this.applyWeaponOnHitEffects(e, e.weapon, 'player');
                             this.showDmg(dmg, 'player', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
                             let extra = '';
                             if (isDisastrous) extra = ' (DISASTROUS HIT!)';
@@ -4414,7 +4702,7 @@ const combat = {
                             if (isDisastrous) this.showCombatToast('BRUTAL HIT', 'status');
                             if (this.hp <= 0 && typeof game.handlePlayerDeath === 'function') game.handlePlayerDeath();
                         } else {
-                            this.showDmg("DODGE", 'player', 'miss');
+                            this.showDmg(Math.random() < 0.5 ? 'DODGE' : 'MISS', 'player', 'miss');
                             this.logMessage(`${e.name}'s attack misses you.`);
                         }
                         this.updateUI();
@@ -4462,7 +4750,7 @@ const combat = {
         const baseGold = 30 + (totalEnemyLevels * 12);
         const baseXp = 70 + (totalEnemyLevels * 20);
         const chr = p.getEffectiveChr();
-        let rewardMult = 1 + chr * 0.025;
+        let rewardMult = 1 + chr * 0.025 + p.getRewardMultiplierBonus();
         if (this.mode === 'no_armor') rewardMult += 0.35;
         if (this.mode === 'duo') rewardMult += 0.75;
 
@@ -4550,7 +4838,7 @@ const combat = {
             el.classList.add('anim-crit');
         }
         else if(type==='miss'){
-            el.innerText = "DODGE";
+            el.innerText = typeof val === 'string' ? val : "DODGE";
             el.style.color = '#ffeb3b';
             el.style.fontSize = '3.5rem';
             el.classList.add('anim-miss');

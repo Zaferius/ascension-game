@@ -14,7 +14,7 @@ const MANUAL_WEAPONS = [
     stat: 'Damage',
     price: 3,
     minShopLevel: 1,
-    statMods: {},
+    statMods: { chr: -1 },
     info: '"better than nothing"',
     infoColor: 'text-orange'
   },
@@ -53,6 +53,8 @@ const RARITY_CONFIG = {
     css: 'rarity-uncommon',
     dmgMult: 1.1,
     statBudget: 2,
+    drawbackChance: 0.08,
+    drawbackBudget: 1,
     prefixes: ['Tempered', 'Runed', 'Gleaming', 'Blessed', 'Barbed']
   },
   rare: {
@@ -60,6 +62,8 @@ const RARITY_CONFIG = {
     css: 'rarity-rare',
     dmgMult: 1.25,
     statBudget: 4,
+    drawbackChance: 0.2,
+    drawbackBudget: 1,
     prefixes: ['Nightforged', 'Stormbound', 'Bloodetched', 'Grimforged', 'Soulbound']
   },
   epic: {
@@ -67,6 +71,8 @@ const RARITY_CONFIG = {
     css: 'rarity-epic',
     dmgMult: 1.4,
     statBudget: 6,
+    drawbackChance: 0.32,
+    drawbackBudget: 2,
     prefixes: ['Eclipseborn', 'Voidcarved', 'Hellforged', 'Dreadwoven', 'Starfallen']
   },
   legendary: {
@@ -74,6 +80,8 @@ const RARITY_CONFIG = {
     css: 'rarity-legendary',
     dmgMult: 1.6,
     statBudget: 8,
+    drawbackChance: 0.12,
+    drawbackBudget: 2,
     prefixes: ['Mythforged', 'Worldrender', 'Godsbane', 'Kingslayer', 'Doomcrowned']
   }
 };
@@ -112,6 +120,67 @@ const LEGENDARY_UNIQUE_NAMES = [
   'Ashen Crown'
 ];
 
+const WEAPON_DOT_AFFIXES = {
+  bleed: {
+    id: 'bleed',
+    prefix: 'Barbed',
+    chanceByRarity: { uncommon: 0.08, rare: 0.16, epic: 0.24, legendary: 0.18 },
+    duration: 3,
+    baseDamage: 4,
+    scale: { str: 0.45, atk: 0.25 },
+    allowedClasses: ['Sword', 'Axe', 'Dagger', 'Spear', 'Hammer']
+  },
+  poison: {
+    id: 'poison',
+    prefix: 'Venomous',
+    chanceByRarity: { uncommon: 0.08, rare: 0.15, epic: 0.22, legendary: 0.16 },
+    duration: 3,
+    baseDamage: 3,
+    scale: { atk: 0.3, chr: 0.18, mag: 0.12 },
+    allowedClasses: ['Dagger', 'Bow', 'Spear', 'Staff']
+  },
+  burn: {
+    id: 'burn',
+    prefix: 'Emberforged',
+    chanceByRarity: { uncommon: 0.06, rare: 0.12, epic: 0.2, legendary: 0.15 },
+    duration: 2,
+    baseDamage: 5,
+    scale: { mag: 0.4, atk: 0.16 },
+    allowedClasses: ['Staff', 'Sword', 'Hammer', 'Bow']
+  }
+};
+
+const WEAPON_ARCHETYPES = {
+  Sword: [
+    { key: 'duelist', positive: ['atk', 'atk', 'str'], negative: ['def', 'mag'], drawbackLabel: 'Reckless' },
+    { key: 'bulwark', positive: ['def', 'atk', 'vit'], negative: ['chr'], drawbackLabel: 'Burdened' }
+  ],
+  Axe: [
+    { key: 'glass_cannon', positive: ['str', 'str', 'atk'], negative: ['def', 'chr'], drawbackLabel: 'Wild' },
+    { key: 'executioner', positive: ['str', 'atk', 'vit'], negative: ['mag'], drawbackLabel: 'Bloodbound' }
+  ],
+  Hammer: [
+    { key: 'juggernaut', positive: ['def', 'def', 'str'], negative: ['atk', 'chr'], drawbackLabel: 'Heavy' },
+    { key: 'breaker', positive: ['str', 'atk', 'def'], negative: ['mag'], drawbackLabel: 'Brutal' }
+  ],
+  Spear: [
+    { key: 'lancer', positive: ['atk', 'atk', 'mag'], negative: ['def'], drawbackLabel: 'Thin' },
+    { key: 'hex_pike', positive: ['mag', 'atk', 'chr'], negative: ['vit'], drawbackLabel: 'Cursed' }
+  ],
+  Dagger: [
+    { key: 'assassin', positive: ['atk', 'atk', 'chr'], negative: ['def', 'vit'], drawbackLabel: 'Fragile' },
+    { key: 'gambler', positive: ['chr', 'atk', 'str'], negative: ['def'], drawbackLabel: 'Greedy' }
+  ],
+  Bow: [
+    { key: 'sniper', positive: ['chr', 'atk', 'atk'], negative: ['def', 'vit'], drawbackLabel: 'Exposed' },
+    { key: 'raider', positive: ['atk', 'chr', 'vit'], negative: ['def'], drawbackLabel: 'Loose' }
+  ],
+  Staff: [
+    { key: 'blood_mage', positive: ['mag', 'mag', 'atk'], negative: ['def', 'vit'], drawbackLabel: 'Sapping' },
+    { key: 'oracle', positive: ['mag', 'chr', 'atk'], negative: ['str'], drawbackLabel: 'Hollow' }
+  ]
+};
+
 const BASE_WEAPON_TYPES = [
   { key: 'shortsword', baseType: 'Shortsword', weaponClass: 'Sword', baseMin: 3, baseMax: 5, scale: 1.1 },
   { key: 'longsword', baseType: 'Longsword', weaponClass: 'Sword', baseMin: 4, baseMax: 7, scale: 1.3 },
@@ -144,15 +213,41 @@ function rngChoice(arr) {
   return arr[rngInt(0, arr.length - 1)];
 }
 
-function allocStats(weaponClass, budget) {
-  const mods = { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
-  if (budget <= 0) return mods;
+function ensureWeaponMods() {
+  return { str: 0, vit: 0, atk: 0, def: 0, chr: 0, mag: 0 };
+}
+
+function weaponPositiveStatPool(statMods) {
+  return STAT_KEYS.filter(key => (statMods[key] || 0) > 0);
+}
+
+function weaponNegativeStatPool(statMods) {
+  return STAT_KEYS.filter(key => (statMods[key] || 0) < 0);
+}
+
+function allocStats(weaponClass, budget, rarityKey) {
+  const mods = ensureWeaponMods();
+  const rarity = RARITY_CONFIG[rarityKey] || RARITY_CONFIG.common;
   const weights = CLASS_WEIGHT_TABLE[weaponClass] || ['atk', 'str', 'vit', 'def', 'chr', 'mag'];
+  const archetypes = WEAPON_ARCHETYPES[weaponClass] || [];
+  const profile = archetypes.length ? { ...rngChoice(archetypes) } : { key: 'balanced', positive: [], negative: [], drawbackLabel: '' };
   for (let i = 0; i < budget; i++) {
-    const k = weights[rngInt(0, weights.length - 1)];
+    const source = profile.positive && profile.positive.length && rngInt(0, 99) < 65 ? profile.positive : weights;
+    const k = source[rngInt(0, source.length - 1)];
     mods[k] = (mods[k] || 0) + 1;
   }
-  return mods;
+  let hasDrawback = false;
+  const drawbackBudget = rarity.drawbackBudget || 0;
+  if (drawbackBudget > 0 && rngInt(0, 999) < Math.floor((rarity.drawbackChance || 0) * 1000)) {
+    hasDrawback = true;
+    const negativePool = (profile.negative && profile.negative.length) ? profile.negative : STAT_KEYS.filter(k => !weaponPositiveStatPool(mods).includes(k));
+    const steps = Math.max(1, drawbackBudget);
+    for (let i = 0; i < steps; i++) {
+      const k = negativePool[rngInt(0, negativePool.length - 1)];
+      mods[k] = (mods[k] || 0) - 1;
+    }
+  }
+  return { mods, profile: { ...profile, hasDrawback } };
 }
 
 function dominantStat(statMods) {
@@ -166,6 +261,21 @@ function dominantStat(statMods) {
     }
   }
   return bestKey;
+}
+
+function dominantNegativeStat(statMods) {
+  const negatives = weaponNegativeStatPool(statMods);
+  if (!negatives.length) return null;
+  let worstKey = negatives[0];
+  let worstVal = 0;
+  for (const key of negatives) {
+    const v = statMods[key] || 0;
+    if (v < worstVal) {
+      worstVal = v;
+      worstKey = key;
+    }
+  }
+  return worstKey;
 }
 
 function computeDamage(baseMin, baseMax, itemLevel, scale, rarityMult) {
@@ -191,11 +301,15 @@ function determineMinShopLevel(avg) {
   return 3 * (bucket - 1) + 1; // 1->1, 2->4, 3->7, 4->10, 5->13, 6->16
 }
 
-function buildName(baseType, rarityKey, statMods) {
+function buildName(baseType, rarityKey, statMods, profile) {
   const rarity = RARITY_CONFIG[rarityKey];
-  const prefix = rarity ? rngChoice(rarity.prefixes) : '';
+  let prefix = rarity ? rngChoice(rarity.prefixes) : '';
   const dom = dominantStat(statMods);
   const suffix = STAT_SUFFIX[dom] || 'of Ruin';
+  const cursedSuffix = dominantNegativeStat(statMods);
+  if (profile && profile.hasDrawback && profile.drawbackLabel && rarityKey !== 'legendary' && rngInt(0, 99) < 70) {
+    prefix = `${profile.drawbackLabel} ${prefix}`.trim();
+  }
   if (rarityKey === 'legendary') {
     return rngChoice(LEGENDARY_UNIQUE_NAMES);
   }
@@ -215,6 +329,31 @@ function priceFrom(avg, itemLevel, rarityMult) {
   return Math.max(1, Math.round(base));
 }
 
+function weaponTradeoffAdjustedPrice(price, statMods) {
+  const positive = weaponPositiveStatPool(statMods).reduce((sum, key) => sum + Math.max(0, statMods[key] || 0), 0);
+  const negative = weaponNegativeStatPool(statMods).reduce((sum, key) => sum + Math.abs(statMods[key] || 0), 0);
+  const mult = 1 + positive * 0.05 - negative * 0.025;
+  return Math.max(1, Math.round(price * Math.max(0.8, mult)));
+}
+
+function rollWeaponDotAffix(weaponClass, rarityKey) {
+  const affixes = Object.values(WEAPON_DOT_AFFIXES).filter(cfg => cfg.allowedClasses.includes(weaponClass));
+  if (!affixes.length) return null;
+  const pool = affixes.filter(cfg => (cfg.chanceByRarity[rarityKey] || 0) > 0);
+  if (!pool.length) return null;
+  const picked = rngChoice(pool);
+  const chance = picked.chanceByRarity[rarityKey] || 0;
+  if (rngInt(0, 999) >= Math.floor(chance * 1000)) return null;
+  return {
+    effect: picked.id,
+    chance,
+    duration: picked.duration,
+    baseDamage: picked.baseDamage,
+    scale: { ...picked.scale },
+    prefix: picked.prefix
+  };
+}
+
 function generateRandomWeapons() {
   const out = [];
   let idx = 0;
@@ -223,16 +362,22 @@ function generateRandomWeapons() {
       for (const rarityKey in RARITY_CONFIG) {
         const rarity = RARITY_CONFIG[rarityKey];
         const dmg = computeDamage(base.baseMin, base.baseMax, itemLevel, base.scale, rarity.dmgMult);
-        const statMods = allocStats(base.weaponClass, rarity.statBudget);
+        const statRoll = allocStats(base.weaponClass, rarity.statBudget, rarityKey);
+        const statMods = statRoll.mods;
         const avg = dmg.avg;
-        const price = priceFrom(avg, itemLevel, rarity.dmgMult);
+        const dotAffix = rollWeaponDotAffix(base.weaponClass, rarityKey);
+        const basePrice = priceFrom(avg, itemLevel, rarity.dmgMult);
+        const price = weaponTradeoffAdjustedPrice(Math.round(basePrice * (dotAffix ? 1.12 : 1)), statMods);
         const minShopLevel = determineMinShopLevel(avg);
-        const name = buildName(base.baseType, rarityKey, statMods);
+        const name = buildName(base.baseType, rarityKey, statMods, statRoll.profile);
         const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
+        const finalName = dotAffix && rarityKey !== 'legendary' && rngInt(0, 99) < 70
+          ? `${dotAffix.prefix} ${name}`.replace(/\s+/g, ' ').trim()
+          : name;
 
         out.push({
           key,
-          name,
+          name: finalName,
           type: 'weapon',
           category: 'weapon',
           rarityKey,
@@ -244,7 +389,11 @@ function generateRandomWeapons() {
           stat: 'Damage',
           price,
           minShopLevel,
-          statMods
+          statMods,
+          affixProfile: statRoll.profile,
+          dotAffix,
+          info: statRoll.profile.hasDrawback ? 'Power traded for a hidden cost.' : undefined,
+          infoColor: statRoll.profile.hasDrawback ? 'text-red' : undefined
         });
       }
     }
