@@ -5,13 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASCENSION</title>
     <link rel="stylesheet" href="gladiator_game.css">
-    <script src="weapon_catalog.js"></script>
-    <script src="armor_catalog.js"></script>
-    <script src="trinket_catalog.js"></script>
-    <script src="enemy_config.js"></script>
-    <script src="skill_tree.js"></script>
-    <script src="sfxConfig.js"></script>
-    <script src="ui_audio.js"></script>
+    <script src="scripts/config/constants.js"></script>
+    <script src="scripts/config/status_effects.js"></script>
+    <script src="scripts/config/audio.js"></script>
+    <script src="scripts/config/potion_defs.js"></script>
+    <script src="scripts/config/injuries.js"></script>
+    <script src="scripts/config/tournaments.js"></script>
+    <script src="scripts/data/weapon_catalog.js"></script>
+    <script src="scripts/data/armor_catalog.js"></script>
+    <script src="scripts/data/trinket_catalog.js"></script>
+    <script src="scripts/data/enemy_config.js"></script>
+    <script src="scripts/data/skill_tree.js"></script>
+    <script src="scripts/core/display_helpers.js"></script>
+    <script src="scripts/core/item_name_generator.js"></script>
+    <script src="scripts/core/item_system.js"></script>
+    <script src="scripts/core/player.js"></script>
+    <script src="scripts/modules/save_load.js"></script>
+    <script src="scripts/modules/shop.js"></script>
+    <script src="scripts/modules/encounter.js"></script>
+    <script src="scripts/modules/blackjack.js"></script>
+    <script src="scripts/modules/combat.js"></script>
     <script src="multiplayer.js"></script>
     <script src="gladiator_game.js"></script>
 
@@ -33,12 +46,30 @@
 
     <!-- START -->
     <div id="screen-start" class="menu-screen">
-        <h1 class="game-title">ASCENSION</h1>
-        <div class="game-subtitle">0.9.1 - Multiplayer Alpha</div>
-        <button class="btn btn-primary" onclick="game.newGameView()">New Game</button>
-        <button class="btn" id="btn-continue" onclick="game.loadLastGame()">Continue</button>
-        <button class="btn" onclick="game.openLoadMenu()">Load</button>
-        <button class="btn" onclick="multiplayerUI.openMenu()">Multiplayer</button>
+        <div class="start-content">
+            <div class="start-eyebrow"></div>
+            <h1 class="game-title">ASCENSION</h1>
+            <div class="game-subtitle">v0.9.1 — Multiplayer Alpha</div>
+            <div class="start-menu-buttons">
+                <button class="btn start-btn start-btn-primary" onclick="game.newGameView()">
+                    <span class="start-btn-icon">⚔</span>
+                    <span class="start-btn-label">New Game</span>
+                </button>
+                <button class="btn start-btn" id="btn-continue" onclick="game.loadLastGame()" style="display:none;">
+                    <span class="start-btn-icon">▶</span>
+                    <span class="start-btn-label">Continue</span>
+                </button>
+                <button class="btn start-btn" onclick="game.openLoadMenu()">
+                    <span class="start-btn-icon">📜</span>
+                    <span class="start-btn-label">Load Gladiator</span>
+                </button>
+                <button class="btn start-btn" onclick="multiplayerUI.openMenu()">
+                    <span class="start-btn-icon">⚡</span>
+                    <span class="start-btn-label">Multiplayer</span>
+                </button>
+            </div>
+            <div class="start-footer">Rise. Fight. Conquer.</div>
+        </div>
     </div>
 
     <div id="screen-multiplayer-menu" class="menu-screen hidden multiplayer-screen">
@@ -460,19 +491,36 @@
 
     <!-- MODALS -->
     <div id="modal-load" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width:520px; text-align:left;">
+        <div class="modal-box load-modal-box">
             <div class="close-btn" onclick="game.closeLoadMenu()">&times;</div>
-            <h2 class="text-gold" style="margin-top:0;">LOAD GLADIATOR</h2>
-            <p style="color:#aaa; font-size:0.9rem;">Select one of your saved gladiators (max 5 slots).</p>
-            <div id="load-slots" style="margin-top:10px;"></div>
+            <div class="load-modal-header">
+                <div class="load-modal-eyebrow">Iron City Arena</div>
+                <h2 class="load-modal-title">SELECT GLADIATOR</h2>
+                <div class="load-modal-sub">Up to 5 save slots</div>
+            </div>
+            <div id="load-slots"></div>
         </div>
     </div>
 
     <div id="modal-victory" class="modal-overlay hidden">
         <div class="modal-box victory-modal">
-            <div class="victory-kicker">Arena Result</div>
-            <h1 class="victory-title">VICTORY!</h1>
+
+            <!-- Tournament round progress bar (hidden for pit fights) -->
+            <div id="vic-tournament-header" class="vic-tournament-header hidden">
+                <div class="vic-tournament-name" id="vic-tournament-name">Iron City Tournament</div>
+                <div class="vic-round-track" id="vic-round-track"></div>
+            </div>
+
+            <!-- Champion banner (final round only) -->
+            <div id="vic-champion-banner" class="vic-champion-banner hidden">
+                <div class="vic-champion-crown">♛</div>
+                <div class="vic-champion-label">CHAMPION</div>
+            </div>
+
+            <div class="victory-kicker" id="vic-kicker">Arena Result</div>
+            <h1 class="victory-title" id="vic-title">VICTORY!</h1>
             <p id="victory-subtitle" class="victory-subtitle">Enemy Defeated.</p>
+
             <div class="victory-reward-grid">
                 <div class="victory-reward-card victory-gold-card">
                     <div class="victory-reward-label">Gold Earned</div>
@@ -483,6 +531,7 @@
                     <div class="victory-reward-value text-blue">+<span id="vic-xp">0</span></div>
                 </div>
             </div>
+
             <div class="victory-xp-panel">
                 <div class="victory-xp-head">
                     <div class="text-blue victory-xp-gain">EXP +<span id="vic-xp-gain">0</span></div>
@@ -490,8 +539,10 @@
                 </div>
                 <div class="xp-bar-container victory-xp-bar-wrap"><div id="vic-xp-bar" class="xp-bar-fill"></div></div>
             </div>
+
             <div id="victory-tournament-banner" class="victory-tournament-banner hidden"></div>
-            <button class="btn btn-primary victory-continue-btn" onclick="game.closeVictory()">CONTINUE</button>
+
+            <button class="btn btn-primary victory-continue-btn" id="vic-continue-btn" onclick="game.closeVictory()">CONTINUE</button>
         </div>
     </div>
 
@@ -566,21 +617,46 @@
     </div>
 
     <div id="modal-inspect" class="modal-overlay hidden" onclick="this.classList.add('hidden')">
-        <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-box inspect-modal-box" onclick="event.stopPropagation()">
             <div class="close-btn" onclick="$('modal-inspect').classList.add('hidden')">&times;</div>
-            <h2 id="ins-name" class="text-red">Enemy Name</h2>
-            <div style="text-align:left; padding:0 20px; font-size:1.1rem; line-height:1.8;">
-                <div>Level: <span id="ins-lvl" class="text-white">1</span></div>
-                <div>Strength: <span id="ins-str" class="text-orange">10</span></div>
-                <div>Attack: <span id="ins-atk" class="text-red">10</span></div>
-                <div>Defence: <span id="ins-def" class="text-blue">10</span></div>
-                <div>Vitality: <span id="ins-vit" class="text-green">10</span></div>
-                <div>Magicka: <span id="ins-mag" class="text-purple">0</span></div>
-                <hr style="border:0; border-top:1px solid #444; margin:10px 0;">
-                <div>Weapon: <span id="ins-weapon-name" class="text-orange" style="cursor:pointer;">Unknown</span></div>
-                <div>Damage Range: <span id="ins-weapon-range" class="text-orange">-</span></div>
-                <div style="color:#888; font-style:italic;" id="ins-desc">"A dangerous foe."</div>
+
+            <!-- Header: avatar + name/level -->
+            <div class="inspect-header">
+                <img id="ins-avatar" src="" alt="" class="inspect-avatar" />
+                <div class="inspect-header-info">
+                    <div class="inspect-name" id="ins-name">Enemy</div>
+                    <div class="inspect-sublabel">Level <span id="ins-lvl" class="text-red">1</span></div>
+                </div>
             </div>
+
+            <!-- HP / Armor -->
+            <div class="inspect-vitals">
+                <div class="stat-row"><span>Health</span><span id="ins-hp-text" class="text-red">– / –</span></div>
+                <div class="stat-row"><span>Armor</span><span id="ins-arm-text" class="text-shield">– / –</span></div>
+            </div>
+
+            <div class="inspect-divider"></div>
+
+            <!-- Base stats grid -->
+            <div class="inspect-stats-grid">
+                <div class="inspect-stat-cell"><span class="inspect-stat-label text-orange">STR</span><span id="ins-str" class="inspect-stat-val">–</span></div>
+                <div class="inspect-stat-cell"><span class="inspect-stat-label text-red">ATK</span><span id="ins-atk" class="inspect-stat-val">–</span></div>
+                <div class="inspect-stat-cell"><span class="inspect-stat-label text-blue">DEF</span><span id="ins-def" class="inspect-stat-val">–</span></div>
+                <div class="inspect-stat-cell"><span class="inspect-stat-label text-green">VIT</span><span id="ins-vit" class="inspect-stat-val">–</span></div>
+                <div class="inspect-stat-cell"><span class="inspect-stat-label text-purple">MAG</span><span id="ins-mag" class="inspect-stat-val">–</span></div>
+            </div>
+
+            <div class="inspect-divider"></div>
+
+            <!-- Weapon -->
+            <div class="stat-row"><span>Weapon</span><span id="ins-weapon-name" class="text-orange" style="cursor:pointer;">–</span></div>
+            <div class="stat-row"><span>Damage</span><span id="ins-weapon-range" class="text-orange">–</span></div>
+
+            <!-- Active status effects -->
+            <div id="ins-status-row" class="inspect-status-row"></div>
+
+            <!-- Flavor text -->
+            <div id="ins-desc" class="inspect-desc"></div>
         </div>
     </div>
 
@@ -745,7 +821,5 @@
 
 </div>
 
-<script src="itemNameGenerator.js"></script>
-<script src="statusEffectsConfig.js"></script>
 </body>
 </html>

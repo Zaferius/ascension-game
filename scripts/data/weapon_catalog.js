@@ -294,10 +294,6 @@ function determineMinShopLevel(avg) {
   return [1, 2, 4, 6, 9, 12][bucket - 1];
 }
 
-function getLegendaryWeaponArchetype(itemLevel) {
-  const idx = Math.max(0, (itemLevel - 1) % LEGENDARY_WEAPON_ARCHETYPES.length);
-  return LEGENDARY_WEAPON_ARCHETYPES[idx];
-}
 
 function buildName(baseType, rarityKey, statMods, profile) {
   const rarity = RARITY_CONFIG[rarityKey];
@@ -353,60 +349,69 @@ function rollWeaponDotAffix(weaponClass, rarityKey) {
 function generateRandomWeapons() {
   const out = [];
   let idx = 0;
+
+  // Non-legendary: normal loop
   for (const base of BASE_WEAPON_TYPES) {
     for (let itemLevel = 1; itemLevel <= 10; itemLevel++) {
       for (const rarityKey in RARITY_CONFIG) {
+        if (rarityKey === 'legendary') continue; // handled separately below
         const rarity = RARITY_CONFIG[rarityKey];
-        let workingBase = base;
-        let legendaryCfg = null;
-        if (rarityKey === 'legendary') {
-          legendaryCfg = getLegendaryWeaponArchetype(itemLevel);
-          if (legendaryCfg.weaponClass !== base.weaponClass) continue;
-          workingBase = {
-            ...base,
-            baseType: legendaryCfg.baseType,
-            weaponClass: legendaryCfg.weaponClass
-          };
-        }
-        const dmg = computeDamage(workingBase.baseMin, workingBase.baseMax, itemLevel, workingBase.scale, rarity.dmgMult);
-        const statRoll = rarityKey === 'legendary'
-          ? { mods: { ...legendaryCfg.statMods }, profile: { key: 'legendary_fixed', hasDrawback: Object.values(legendaryCfg.statMods).some(v => v < 0), drawbackLabel: '', legendaryName: legendaryCfg.name } }
-          : allocStats(workingBase.weaponClass, rarity.statBudget, rarityKey);
+        const dmg = computeDamage(base.baseMin, base.baseMax, itemLevel, base.scale, rarity.dmgMult);
+        const statRoll = allocStats(base.weaponClass, rarity.statBudget, rarityKey);
         const statMods = statRoll.mods;
         const avg = dmg.avg;
-        const dotAffix = rarityKey === 'legendary' ? (legendaryCfg.dotAffix ? { ...legendaryCfg.dotAffix } : null) : rollWeaponDotAffix(workingBase.weaponClass, rarityKey);
+        const dotAffix = rollWeaponDotAffix(base.weaponClass, rarityKey);
         const basePrice = priceFrom(avg, itemLevel, rarity.dmgMult);
         const price = weaponTradeoffAdjustedPrice(Math.round(basePrice * (dotAffix ? 1.12 : 1)), statMods);
-        const minShopLevel = rarityKey === 'legendary' ? Math.max(4, determineMinShopLevel(avg)) : determineMinShopLevel(avg);
-        const name = buildName(workingBase.baseType, rarityKey, statMods, statRoll.profile);
+        const minShopLevel = determineMinShopLevel(avg);
+        const name = buildName(base.baseType, rarityKey, statMods, statRoll.profile);
         const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
-        const finalName = dotAffix && rarityKey !== 'legendary' && rngInt(0, 99) < 70
+        const finalName = dotAffix && rngInt(0, 99) < 70
           ? `${dotAffix.prefix} ${name}`.replace(/\s+/g, ' ').trim()
           : name;
-
         out.push({
-          key,
-          name: finalName,
-          type: 'weapon',
-          category: 'weapon',
-          rarityKey,
-          rarity: rarity.css,
-          baseType: workingBase.baseType,
-          weaponClass: workingBase.weaponClass,
-          min: dmg.min,
-          max: dmg.max,
-          stat: 'Damage',
-          price,
-          minShopLevel,
-          statMods,
-          affixProfile: statRoll.profile,
-          dotAffix,
+          key, name: finalName, type: 'weapon', category: 'weapon',
+          rarityKey, rarity: rarity.css,
+          baseType: base.baseType, weaponClass: base.weaponClass,
+          min: dmg.min, max: dmg.max, stat: 'Damage',
+          price, minShopLevel, statMods,
+          affixProfile: statRoll.profile, dotAffix,
           info: statRoll.profile.hasDrawback ? 'Power traded for a hidden cost.' : undefined,
           infoColor: statRoll.profile.hasDrawback ? 'text-red' : undefined
         });
       }
     }
   }
+
+  // Legendary: each archetype appears at every level 4–10, always same type + stats, only damage scales
+  const legendaryRarity = RARITY_CONFIG.legendary;
+  for (const arch of LEGENDARY_WEAPON_ARCHETYPES) {
+    const matchingBase = BASE_WEAPON_TYPES.find(b => b.baseType === arch.baseType)
+                      || BASE_WEAPON_TYPES.find(b => b.weaponClass === arch.weaponClass);
+    if (!matchingBase) continue;
+    for (let itemLevel = 4; itemLevel <= 10; itemLevel++) {
+      const dmg = computeDamage(matchingBase.baseMin, matchingBase.baseMax, itemLevel, matchingBase.scale, legendaryRarity.dmgMult);
+      const statMods = { ...arch.statMods };
+      const avg = dmg.avg;
+      const dotAffix = arch.dotAffix ? { ...arch.dotAffix } : null;
+      const basePrice = priceFrom(avg, itemLevel, legendaryRarity.dmgMult);
+      const price = weaponTradeoffAdjustedPrice(Math.round(basePrice * (dotAffix ? 1.12 : 1)), statMods);
+      const minShopLevel = Math.max(4, determineMinShopLevel(avg));
+      const key = `gen_legendary_${arch.name.replace(/\s+/g, '_').toLowerCase()}_l${itemLevel}_${idx++}`;
+      out.push({
+        key, name: arch.name, type: 'weapon', category: 'weapon',
+        rarityKey: 'legendary', rarity: legendaryRarity.css,
+        baseType: arch.baseType, weaponClass: arch.weaponClass,
+        min: dmg.min, max: dmg.max, stat: 'Damage',
+        price, minShopLevel, statMods,
+        affixProfile: { key: 'legendary_fixed', hasDrawback: Object.values(statMods).some(v => v < 0), drawbackLabel: '', legendaryName: arch.name },
+        dotAffix,
+        info: Object.values(statMods).some(v => v < 0) ? 'Power traded for a hidden cost.' : undefined,
+        infoColor: Object.values(statMods).some(v => v < 0) ? 'text-red' : undefined
+      });
+    }
+  }
+
   return out;
 }
 

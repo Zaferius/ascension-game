@@ -1,15 +1,11 @@
  -Büyücü itemleri büyü yapma olayı
 -Bleed efekti durdurmak icin bandaj itemi. (Bleed cured gibi mesaj)
--Projedeki script dosyaları cok doldu cok şişti. Scriptleri ayırıp daha düzgün temiz çalışalım. (Örneğin injury library'yi ayrı bir scriptte tutalım daha sonra refactor edersek kolay olsun her şey).
-- Mainmenu UI UX Polish
--dövüş sırasında kalıcı hasra almak Hastalık/sakatlık yaşamak -5 STR ve -5 DEX gibi. 3 4 savas süren.
--Legend itemler +4 leveldan baslamalı daha düsük legend silah olmamalı. Ayrıca Legend silahlar farklı türde olmamalı. Atıyorum "The Eclipse" silahı her zaman bir balta olmalı ve verdiği statlar aynı statlar olmalı. Yalnızca levellara göre farklılık göstermeli değerleri. Bu bütün legend silahlar icin gecerli.
--düsmanların üzerine tıklayınca acılan bilgi kartı polish edelim. 
--Turnuva sırasında level atlarsak normal sekilde level upgrade'i yapabilelim. Turnuvanın bitmesine gerek yok. Örneğin 4. düsmanı yendim ve level atladım. upgrade ekranı geldi yaptım. Sonra kaldıgı yerden devam etsin oyun.
--Turnuva win screen polish edelim.
--Skill treede bir özelligi sonuna kadar upgrade edince örneğin 3/3 yapınca artık o kart etrafı sarı glow olsun bitmiş olsun. 
--Turnuvada şampiyonların isimleri sarı glow olsun. 
 -Combat sırasında görünen logları biraz daha hikayelestirmeliyiz. Örneğin "You strike the enemy with your sword" yerine "With a mighty swing, you cleave the enemy's armor" gibi daha dramatik ve hikayeli ifadeler kullanabiliriz. Injury / Hastalık yediğimiz anları da böyle loglayalım. örneğin "You feel a sharp pain in your side as a wound festers" yerine "A festering wound on your side throbs with excruciating pain" [SAKATLIK İSMİ] gibi daha dramatik ve hikayeli ifadeler kullanabiliriz. Planlayalım.
+-1. turnuva sırasında tam 3 level atladıgım icin 1. turnuva biter bitmez diğerine girmeye hak kazandım. Bunu biraz dengelemek lazım. 
+-Pot fiyatları?? Test et para hilesi yapmadan.
+-Attack puanım 1 olmasına ragmen oldukca fazla vurus ihtimaline sahibim. bunu biraz nerfleyelim.
+
+
 
 -perhance enemy avatar seed: //// (seed:::876714083)
 Enemy Avatar Prompt:
