@@ -29,7 +29,7 @@ const ARMOR_RARITY_CONFIG = {
     css: 'rarity-uncommon',
     armorMult: 1.1,
     statBudget: 2,
-    drawbackChance: 0.08,
+    drawbackChance: 0.05,
     drawbackBudget: 1
   },
   rare: {
@@ -37,7 +37,7 @@ const ARMOR_RARITY_CONFIG = {
     css: 'rarity-rare',
     armorMult: 1.25,
     statBudget: 4,
-    drawbackChance: 0.18,
+    drawbackChance: 0.12,
     drawbackBudget: 1
   },
   epic: {
@@ -45,7 +45,7 @@ const ARMOR_RARITY_CONFIG = {
     css: 'rarity-epic',
     armorMult: 1.4,
     statBudget: 6,
-    drawbackChance: 0.28,
+    drawbackChance: 0.2,
     drawbackBudget: 2
   },
   legendary: {
@@ -53,7 +53,7 @@ const ARMOR_RARITY_CONFIG = {
     css: 'rarity-legendary',
     armorMult: 1.6,
     statBudget: 8,
-    drawbackChance: 0.1,
+    drawbackChance: 0.07,
     drawbackBudget: 2
   }
 };
@@ -215,7 +215,7 @@ function determineArmorMinShopLevel(avg) {
   else if (avg <= 14) bucket = 4;
   else if (avg <= 17) bucket = 5;
   else bucket = 6;
-  return 3 * (bucket - 1) + 1; // 1->1, 2->4, 3->7, 4->10, 5->13, 6->16
+  return [1, 2, 4, 6, 9, 12][bucket - 1];
 }
 
 function buildArmorName(baseType, rarityKey, statMods, profile) {

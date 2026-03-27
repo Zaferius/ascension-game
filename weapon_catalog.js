@@ -25,13 +25,13 @@ const MANUAL_WEAPONS = [
     category: 'weapon',
     rarityKey: 'legendary',
     rarity: 'rarity-legendary',
-    baseType: 'Longbow',
-    weaponClass: 'Bow',
+    baseType: 'Crossbow',
+    weaponClass: 'Crossbow',
     min: 19,
     max: 27,
     stat: 'Damage',
     price: 420,
-    minShopLevel: 5,
+    minShopLevel: 4,
     statMods: { atk: 6, chr: 4 },
     info: "'If it sings, someone dies.'",
     infoColor: 'text-purple'
@@ -53,7 +53,7 @@ const RARITY_CONFIG = {
     css: 'rarity-uncommon',
     dmgMult: 1.1,
     statBudget: 2,
-    drawbackChance: 0.08,
+    drawbackChance: 0.06,
     drawbackBudget: 1,
     prefixes: ['Tempered', 'Runed', 'Gleaming', 'Blessed', 'Barbed']
   },
@@ -62,7 +62,7 @@ const RARITY_CONFIG = {
     css: 'rarity-rare',
     dmgMult: 1.25,
     statBudget: 4,
-    drawbackChance: 0.2,
+    drawbackChance: 0.16,
     drawbackBudget: 1,
     prefixes: ['Nightforged', 'Stormbound', 'Bloodetched', 'Grimforged', 'Soulbound']
   },
@@ -71,7 +71,7 @@ const RARITY_CONFIG = {
     css: 'rarity-epic',
     dmgMult: 1.4,
     statBudget: 6,
-    drawbackChance: 0.32,
+    drawbackChance: 0.24,
     drawbackBudget: 2,
     prefixes: ['Eclipseborn', 'Voidcarved', 'Hellforged', 'Dreadwoven', 'Starfallen']
   },
@@ -80,7 +80,7 @@ const RARITY_CONFIG = {
     css: 'rarity-legendary',
     dmgMult: 1.6,
     statBudget: 8,
-    drawbackChance: 0.12,
+    drawbackChance: 0.08,
     drawbackBudget: 2,
     prefixes: ['Mythforged', 'Worldrender', 'Godsbane', 'Kingslayer', 'Doomcrowned']
   }
@@ -91,11 +91,9 @@ const STAT_KEYS = ['str', 'vit', 'atk', 'def', 'chr', 'mag'];
 const CLASS_WEIGHT_TABLE = {
   Sword: ['atk', 'atk', 'atk', 'str', 'str', 'vit', 'def', 'chr'],
   Axe: ['str', 'str', 'str', 'atk', 'vit', 'def'],
-  Hammer: ['str', 'str', 'def', 'def', 'vit', 'atk'],
   Spear: ['atk', 'atk', 'mag', 'mag', 'str', 'vit'],
   Dagger: ['atk', 'atk', 'atk', 'chr', 'chr', 'vit'],
-  Bow: ['chr', 'chr', 'atk', 'atk', 'vit'],
-  Staff: ['mag', 'mag', 'mag', 'atk', 'atk', 'vit']
+  Crossbow: ['chr', 'chr', 'atk', 'atk', 'vit']
 };
 
 const STAT_SUFFIX = {
@@ -120,33 +118,46 @@ const LEGENDARY_UNIQUE_NAMES = [
   'Ashen Crown'
 ];
 
+const LEGENDARY_WEAPON_ARCHETYPES = [
+  { name: 'The Eclipse', weaponClass: 'Axe', baseType: 'War Axe', statMods: { str: 4, atk: 3, def: 1 }, dotAffix: { effect: 'bleed', chance: 0.12, duration: 3, baseDamage: 5, scale: { str: 0.45, atk: 0.2 }, prefix: 'Barbed' } },
+  { name: 'Dawnguard', weaponClass: 'Sword', baseType: 'Longsword', statMods: { atk: 4, def: 3, vit: 2 }, dotAffix: null },
+  { name: 'Hellscream', weaponClass: 'Axe', baseType: 'War Axe', statMods: { str: 5, atk: 2, chr: -1 }, dotAffix: { effect: 'burn', chance: 0.1, duration: 2, baseDamage: 5, scale: { atk: 0.18, mag: 0.18 }, prefix: 'Emberforged' } },
+  { name: 'Nightreaver', weaponClass: 'Dagger', baseType: 'Twin Daggers', statMods: { atk: 4, chr: 2, def: -1 }, dotAffix: { effect: 'poison', chance: 0.14, duration: 3, baseDamage: 4, scale: { atk: 0.26, chr: 0.16 }, prefix: 'Venomous' } },
+  { name: 'Soulrender', weaponClass: 'Sword', baseType: 'Shortsword', statMods: { atk: 4, mag: 3, vit: -1 }, dotAffix: { effect: 'burn', chance: 0.1, duration: 2, baseDamage: 5, scale: { mag: 0.3, atk: 0.12 }, prefix: 'Emberforged' } },
+  { name: 'Kingsbane', weaponClass: 'Spear', baseType: 'Pike', statMods: { atk: 4, def: 2, chr: 2 }, dotAffix: null },
+  { name: 'Voidhowl', weaponClass: 'Crossbow', baseType: 'Arbalest', statMods: { atk: 4, chr: 3, def: -1 }, dotAffix: { effect: 'poison', chance: 0.12, duration: 3, baseDamage: 4, scale: { atk: 0.24, chr: 0.18 }, prefix: 'Venomous' } },
+  { name: 'Grim Oath', weaponClass: 'Sword', baseType: 'Longsword', statMods: { def: 4, vit: 3, atk: 2 }, dotAffix: null },
+  { name: 'Blood Omen', weaponClass: 'Dagger', baseType: 'Dagger', statMods: { atk: 5, str: 2, vit: -1 }, dotAffix: { effect: 'bleed', chance: 0.12, duration: 3, baseDamage: 4, scale: { str: 0.35, atk: 0.22 }, prefix: 'Barbed' } },
+  { name: 'Ashen Crown', weaponClass: 'Crossbow', baseType: 'Crossbow', statMods: { chr: 4, atk: 3, def: 1 }, dotAffix: null }
+];
+
 const WEAPON_DOT_AFFIXES = {
   bleed: {
     id: 'bleed',
     prefix: 'Barbed',
-    chanceByRarity: { uncommon: 0.08, rare: 0.16, epic: 0.24, legendary: 0.18 },
+    chanceByRarity: { uncommon: 0.06, rare: 0.12, epic: 0.18, legendary: 0.14 },
     duration: 3,
     baseDamage: 4,
     scale: { str: 0.45, atk: 0.25 },
-    allowedClasses: ['Sword', 'Axe', 'Dagger', 'Spear', 'Hammer']
+    allowedClasses: ['Sword', 'Axe', 'Dagger', 'Spear']
   },
   poison: {
     id: 'poison',
     prefix: 'Venomous',
-    chanceByRarity: { uncommon: 0.08, rare: 0.15, epic: 0.22, legendary: 0.16 },
+    chanceByRarity: { uncommon: 0.06, rare: 0.12, epic: 0.18, legendary: 0.14 },
     duration: 3,
     baseDamage: 3,
     scale: { atk: 0.3, chr: 0.18, mag: 0.12 },
-    allowedClasses: ['Dagger', 'Bow', 'Spear', 'Staff']
+    allowedClasses: ['Dagger', 'Crossbow', 'Spear']
   },
   burn: {
     id: 'burn',
     prefix: 'Emberforged',
-    chanceByRarity: { uncommon: 0.06, rare: 0.12, epic: 0.2, legendary: 0.15 },
+    chanceByRarity: { uncommon: 0.05, rare: 0.1, epic: 0.15, legendary: 0.12 },
     duration: 2,
     baseDamage: 5,
     scale: { mag: 0.4, atk: 0.16 },
-    allowedClasses: ['Staff', 'Sword', 'Hammer', 'Bow']
+    allowedClasses: ['Sword', 'Axe', 'Crossbow']
   }
 };
 
@@ -159,10 +170,6 @@ const WEAPON_ARCHETYPES = {
     { key: 'glass_cannon', positive: ['str', 'str', 'atk'], negative: ['def', 'chr'], drawbackLabel: 'Wild' },
     { key: 'executioner', positive: ['str', 'atk', 'vit'], negative: ['mag'], drawbackLabel: 'Bloodbound' }
   ],
-  Hammer: [
-    { key: 'juggernaut', positive: ['def', 'def', 'str'], negative: ['atk', 'chr'], drawbackLabel: 'Heavy' },
-    { key: 'breaker', positive: ['str', 'atk', 'def'], negative: ['mag'], drawbackLabel: 'Brutal' }
-  ],
   Spear: [
     { key: 'lancer', positive: ['atk', 'atk', 'mag'], negative: ['def'], drawbackLabel: 'Thin' },
     { key: 'hex_pike', positive: ['mag', 'atk', 'chr'], negative: ['vit'], drawbackLabel: 'Cursed' }
@@ -171,26 +178,18 @@ const WEAPON_ARCHETYPES = {
     { key: 'assassin', positive: ['atk', 'atk', 'chr'], negative: ['def', 'vit'], drawbackLabel: 'Fragile' },
     { key: 'gambler', positive: ['chr', 'atk', 'str'], negative: ['def'], drawbackLabel: 'Greedy' }
   ],
-  Bow: [
+  Crossbow: [
     { key: 'sniper', positive: ['chr', 'atk', 'atk'], negative: ['def', 'vit'], drawbackLabel: 'Exposed' },
     { key: 'raider', positive: ['atk', 'chr', 'vit'], negative: ['def'], drawbackLabel: 'Loose' }
-  ],
-  Staff: [
-    { key: 'blood_mage', positive: ['mag', 'mag', 'atk'], negative: ['def', 'vit'], drawbackLabel: 'Sapping' },
-    { key: 'oracle', positive: ['mag', 'chr', 'atk'], negative: ['str'], drawbackLabel: 'Hollow' }
   ]
 };
 
 const BASE_WEAPON_TYPES = [
   { key: 'shortsword', baseType: 'Shortsword', weaponClass: 'Sword', baseMin: 3, baseMax: 5, scale: 1.1 },
   { key: 'longsword', baseType: 'Longsword', weaponClass: 'Sword', baseMin: 4, baseMax: 7, scale: 1.3 },
-  { key: 'greatsword', baseType: 'Greatsword', weaponClass: 'Sword', baseMin: 6, baseMax: 9, scale: 1.5 },
 
   { key: 'hand_axe', baseType: 'Hand Axe', weaponClass: 'Axe', baseMin: 4, baseMax: 7, scale: 1.4 },
   { key: 'war_axe', baseType: 'War Axe', weaponClass: 'Axe', baseMin: 6, baseMax: 9, scale: 1.6 },
-
-  { key: 'mace', baseType: 'Mace', weaponClass: 'Hammer', baseMin: 5, baseMax: 8, scale: 1.5 },
-  { key: 'maul', baseType: 'Maul', weaponClass: 'Hammer', baseMin: 7, baseMax: 10, scale: 1.7 },
 
   { key: 'spear', baseType: 'Spear', weaponClass: 'Spear', baseMin: 4, baseMax: 7, scale: 1.4 },
   { key: 'pike', baseType: 'Pike', weaponClass: 'Spear', baseMin: 6, baseMax: 9, scale: 1.6 },
@@ -198,11 +197,8 @@ const BASE_WEAPON_TYPES = [
   { key: 'dagger', baseType: 'Dagger', weaponClass: 'Dagger', baseMin: 2, baseMax: 5, scale: 1.2 },
   { key: 'twin_daggers', baseType: 'Twin Daggers', weaponClass: 'Dagger', baseMin: 3, baseMax: 6, scale: 1.4 },
 
-  { key: 'shortbow', baseType: 'Shortbow', weaponClass: 'Bow', baseMin: 3, baseMax: 6, scale: 1.3 },
-  { key: 'longbow', baseType: 'Longbow', weaponClass: 'Bow', baseMin: 4, baseMax: 8, scale: 1.5 },
-
-  { key: 'oak_staff', baseType: 'Oak Staff', weaponClass: 'Staff', baseMin: 3, baseMax: 6, scale: 1.3 },
-  { key: 'rune_staff', baseType: 'Runed Staff', weaponClass: 'Staff', baseMin: 4, baseMax: 7, scale: 1.5 }
+  { key: 'crossbow', baseType: 'Crossbow', weaponClass: 'Crossbow', baseMin: 3, baseMax: 6, scale: 1.3 },
+  { key: 'arbalest', baseType: 'Arbalest', weaponClass: 'Crossbow', baseMin: 4, baseMax: 8, scale: 1.5 }
 ];
 
 function rngInt(min, max) {
@@ -288,9 +284,6 @@ function computeDamage(baseMin, baseMax, itemLevel, scale, rarityMult) {
 }
 
 function determineMinShopLevel(avg) {
-  // Eski tasarım 1–6 arasında bucket veriyordu; bunu daha geniş bir
-  // level skalasına yaymak için önce bucket'ı hesaplayıp sonra
-  // 1..6 -> 1,4,7,10,13,16 şeklinde map ediyoruz.
   let bucket;
   if (avg <= 7) bucket = 1;
   else if (avg <= 11) bucket = 2;
@@ -298,7 +291,12 @@ function determineMinShopLevel(avg) {
   else if (avg <= 19) bucket = 4;
   else if (avg <= 24) bucket = 5;
   else bucket = 6;
-  return 3 * (bucket - 1) + 1; // 1->1, 2->4, 3->7, 4->10, 5->13, 6->16
+  return [1, 2, 4, 6, 9, 12][bucket - 1];
+}
+
+function getLegendaryWeaponArchetype(itemLevel) {
+  const idx = Math.max(0, (itemLevel - 1) % LEGENDARY_WEAPON_ARCHETYPES.length);
+  return LEGENDARY_WEAPON_ARCHETYPES[idx];
 }
 
 function buildName(baseType, rarityKey, statMods, profile) {
@@ -310,9 +308,7 @@ function buildName(baseType, rarityKey, statMods, profile) {
   if (profile && profile.hasDrawback && profile.drawbackLabel && rarityKey !== 'legendary' && rngInt(0, 99) < 70) {
     prefix = `${profile.drawbackLabel} ${prefix}`.trim();
   }
-  if (rarityKey === 'legendary') {
-    return rngChoice(LEGENDARY_UNIQUE_NAMES);
-  }
+  if (rarityKey === 'legendary') return (profile && profile.legendaryName) || rngChoice(LEGENDARY_UNIQUE_NAMES);
   if (rarityKey === 'common' || rarityKey === 'uncommon') {
     return `${prefix} ${baseType}`.replace(/\s+/g, ' ').trim();
   }
@@ -361,15 +357,28 @@ function generateRandomWeapons() {
     for (let itemLevel = 1; itemLevel <= 10; itemLevel++) {
       for (const rarityKey in RARITY_CONFIG) {
         const rarity = RARITY_CONFIG[rarityKey];
-        const dmg = computeDamage(base.baseMin, base.baseMax, itemLevel, base.scale, rarity.dmgMult);
-        const statRoll = allocStats(base.weaponClass, rarity.statBudget, rarityKey);
+        let workingBase = base;
+        let legendaryCfg = null;
+        if (rarityKey === 'legendary') {
+          legendaryCfg = getLegendaryWeaponArchetype(itemLevel);
+          if (legendaryCfg.weaponClass !== base.weaponClass) continue;
+          workingBase = {
+            ...base,
+            baseType: legendaryCfg.baseType,
+            weaponClass: legendaryCfg.weaponClass
+          };
+        }
+        const dmg = computeDamage(workingBase.baseMin, workingBase.baseMax, itemLevel, workingBase.scale, rarity.dmgMult);
+        const statRoll = rarityKey === 'legendary'
+          ? { mods: { ...legendaryCfg.statMods }, profile: { key: 'legendary_fixed', hasDrawback: Object.values(legendaryCfg.statMods).some(v => v < 0), drawbackLabel: '', legendaryName: legendaryCfg.name } }
+          : allocStats(workingBase.weaponClass, rarity.statBudget, rarityKey);
         const statMods = statRoll.mods;
         const avg = dmg.avg;
-        const dotAffix = rollWeaponDotAffix(base.weaponClass, rarityKey);
+        const dotAffix = rarityKey === 'legendary' ? (legendaryCfg.dotAffix ? { ...legendaryCfg.dotAffix } : null) : rollWeaponDotAffix(workingBase.weaponClass, rarityKey);
         const basePrice = priceFrom(avg, itemLevel, rarity.dmgMult);
         const price = weaponTradeoffAdjustedPrice(Math.round(basePrice * (dotAffix ? 1.12 : 1)), statMods);
-        const minShopLevel = determineMinShopLevel(avg);
-        const name = buildName(base.baseType, rarityKey, statMods, statRoll.profile);
+        const minShopLevel = rarityKey === 'legendary' ? Math.max(4, determineMinShopLevel(avg)) : determineMinShopLevel(avg);
+        const name = buildName(workingBase.baseType, rarityKey, statMods, statRoll.profile);
         const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
         const finalName = dotAffix && rarityKey !== 'legendary' && rngInt(0, 99) < 70
           ? `${dotAffix.prefix} ${name}`.replace(/\s+/g, ' ').trim()
@@ -382,8 +391,8 @@ function generateRandomWeapons() {
           category: 'weapon',
           rarityKey,
           rarity: rarity.css,
-          baseType: base.baseType,
-          weaponClass: base.weaponClass,
+          baseType: workingBase.baseType,
+          weaponClass: workingBase.weaponClass,
           min: dmg.min,
           max: dmg.max,
           stat: 'Damage',

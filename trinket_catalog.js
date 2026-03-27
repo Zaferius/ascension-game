@@ -34,7 +34,7 @@ const TRINKET_RARITY_CONFIG = {
     css: 'rarity-uncommon',
     statBudget: 2,
     priceMult: 1.2,
-    drawbackChance: 0.1,
+    drawbackChance: 0.06,
     drawbackBudget: 1
   },
   rare: {
@@ -42,7 +42,7 @@ const TRINKET_RARITY_CONFIG = {
     css: 'rarity-rare',
     statBudget: 4,
     priceMult: 1.5,
-    drawbackChance: 0.22,
+    drawbackChance: 0.15,
     drawbackBudget: 1
   },
   epic: {
@@ -50,7 +50,7 @@ const TRINKET_RARITY_CONFIG = {
     css: 'rarity-epic',
     statBudget: 6,
     priceMult: 1.9,
-    drawbackChance: 0.34,
+    drawbackChance: 0.24,
     drawbackBudget: 2
   },
   legendary: {
@@ -58,7 +58,7 @@ const TRINKET_RARITY_CONFIG = {
     css: 'rarity-legendary',
     statBudget: 8,
     priceMult: 2.5,
-    drawbackChance: 0.14,
+    drawbackChance: 0.1,
     drawbackBudget: 2
   }
 };
@@ -200,7 +200,6 @@ function trinketPower(statMods) {
 
 function determineTrinketMinShopLevel(power, itemLevel) {
   const score = power + itemLevel;
-  // Önce eski 1–6 bucket'ını hesapla, sonra 1..6 -> 1,4,7,10,13,16 map et
   let bucket;
   if (score <= 2) bucket = 1;
   else if (score <= 4) bucket = 2;
@@ -208,7 +207,7 @@ function determineTrinketMinShopLevel(power, itemLevel) {
   else if (score <= 8) bucket = 4;
   else if (score <= 10) bucket = 5;
   else bucket = 6;
-  return 3 * (bucket - 1) + 1;
+  return [1, 2, 4, 6, 9, 12][bucket - 1];
 }
 
 function buildTrinketName(baseType, rarityKey, statMods, profile) {

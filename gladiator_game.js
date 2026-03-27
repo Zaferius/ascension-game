@@ -9,6 +9,39 @@ const SHOP_REFRESH_INTERVAL = 10;
 // How many fights before potion shop stock refreshes
 const POTION_REFRESH_INTERVAL = 5;
 const MAX_TOURNAMENT_TIER = 20;
+const INJURY_LIBRARY = [
+    { id: 'fractured_leg', name: 'Fractured Leg', duration: 3, severity: 'major', effects: { dodgePenalty: 8, hitChancePenalty: 4 }, summary: '-8 Dodge / -4 Hit' },
+    { id: 'twisted_knee', name: 'Twisted Knee', duration: 2, severity: 'minor', effects: { dodgePenalty: 5, atkFlatPenalty: 2 }, summary: '-5 Dodge / -2 Attack' },
+    { id: 'dislocated_shoulder', name: 'Dislocated Shoulder', duration: 3, severity: 'major', effects: { atkFlatPenalty: 3, critChancePenalty: 6 }, summary: '-3 Attack / -6 Crit' },
+    { id: 'fractured_wrist', name: 'Fractured Wrist', duration: 2, severity: 'minor', effects: { atkFlatPenalty: 2, hitChancePenalty: 4 }, summary: '-2 Attack / -4 Hit' },
+    { id: 'cracked_ribs', name: 'Cracked Ribs', duration: 3, severity: 'major', effects: { hpFlatPenalty: 18, regenPenalty: 1 }, summary: '-18 Health / -1 Regen' },
+    { id: 'bruised_lungs', name: 'Bruised Lungs', duration: 2, severity: 'minor', effects: { regenPenalty: 1, hitChancePenalty: 3 }, summary: '-1 Regen / -3 Hit' },
+    { id: 'concussion', name: 'Concussion', duration: 2, severity: 'major', effects: { hitChancePenalty: 6, critChancePenalty: 6 }, summary: '-6 Hit / -6 Crit' },
+    { id: 'broken_guard', name: 'Broken Guard', duration: 3, severity: 'major', effects: { armorMultPenalty: 0.12, defFlatPenalty: 3 }, summary: '-12% Armor / -3 Defence' },
+    { id: 'internal_bleeding', name: 'Internal Bleeding', duration: 2, severity: 'major', effects: { hpFlatPenalty: 12, regenPenalty: 2 }, summary: '-12 Health / -2 Regen' }
+];
+const TOURNAMENT_TIERS = [
+    { tier: 1, name: 'Ash Gate Trials', theme: 'New blood stains the sand beneath the cracked city gate.', final: ['Ragpicker the Cunning'] },
+    { tier: 2, name: 'Black Dust Circuit', theme: 'Faster killers circle the pit while the crowd begins to notice.', final: ['Blackfang the Swift'] },
+    { tier: 3, name: 'Cinder Crown Open', theme: 'Weapon specialists emerge, each eager to carve a title.', final: ['Ironjaw the Brutal'] },
+    { tier: 4, name: 'Grimhook Gauntlet', theme: 'The city sends executioners rather than brawlers.', final: ['Grimhook the Relentless'] },
+    { tier: 5, name: 'Blood Banner Rounds', theme: 'Veterans of the old pits return under torn crimson standards.', final: ['Ashveil the Unbroken'] },
+    { tier: 6, name: 'Broken Oath Cup', theme: 'Paladins, deserters, and mercenaries collide for iron coin.', final: ['Oathscar the Guarded'] },
+    { tier: 7, name: 'Bone Lantern Trials', theme: 'The dead and the desperate both answer the call.', final: ['Bonegrin the Tireless'] },
+    { tier: 8, name: 'Red Quarry Clash', theme: 'The quarry fighters bring savage force and little mercy.', final: ['Bloodtusk the Juggernaut'] },
+    { tier: 9, name: 'Iron Ledger League', theme: 'Only proven killers survive the accountants of the arena.', final: ['Blackvigil the Stalwart'] },
+    { tier: 10, name: 'Howling Sand Major', theme: 'Every round is louder, richer, and more lethal than the last.', final: ['Warfang the Reaper'] },
+    { tier: 11, name: 'Cinder Vow Trials', theme: 'Fire-marked duelists and oathbreakers command the stands.', final: ['Cindervow the Savage'] },
+    { tier: 12, name: 'Cryptbone Masters', theme: 'Veterans whisper that no one reaches the end untouched.', final: ['Cryptfang the Enduring'] },
+    { tier: 13, name: 'Goremaw Invitational', theme: 'Only specialists and monsters earn a place in this blood-soaked ascent.', final: ['Goremaw the Brutal'] },
+    { tier: 14, name: 'Palecrest Ascension', theme: 'The city expects spectacle, and the ascent delivers blood.', final: ['Palecrest the Ironwall'] },
+    { tier: 15, name: 'Skullbrand Supreme', theme: 'Named killers enter in pairs and leave in pieces.', final: ['Skullbrand the Pit Wolf', 'Dreadhook the Relentless'] },
+    { tier: 16, name: 'Dreadrattle Crown', theme: 'The old pits shake with heavier armor and sharper steel.', final: ['Dreadrattle the Unbroken', 'Bleakskull the Guarded'] },
+    { tier: 17, name: 'Ember Throne Cup', theme: 'The crowd roars only for champions and spectacular deaths.', final: ['Graveshield the Stalwart', 'Grimtusk the Ravager'] },
+    { tier: 18, name: 'Pit Wolf Dominion', theme: 'Every victory here is a public execution of the weak.', final: ['Stonejaw the Iron Beast', 'Rattlebrand the Relentless'] },
+    { tier: 19, name: 'Last Oath Championship', theme: 'The city gathers to witness the final proving of iron and will.', final: ['Hollowbrand the Arena Fang', 'Ironscar the Butcher'] },
+    { tier: 20, name: 'Iron City Grand Ascension', theme: 'The final ascent crowns the one name the city cannot forget.', final: ['Vorga the Pit King', 'Ser Caldus the Unbroken'] }
+];
 
 // In-game portrait images for combat
 const PLAYER_AVATAR_IMG = 'assets/images/ingame-avatars/player.png';
@@ -96,6 +129,27 @@ const getDisplayItemType = (item) => {
     if (item.type === 'trinket') return item.baseType || 'Trinket';
     if (item.type === 'potion') return 'Potion';
     return item.baseType || item.weaponClass || '';
+};
+const getInjuryById = (id) => INJURY_LIBRARY.find(injury => injury.id === id) || null;
+const getWeaponIconPathShared = (item) => {
+    if (!item || item.type !== 'weapon') return '';
+    const cls = (item.weaponClass || '').toLowerCase();
+    const baseLower = (item.baseType || '').toLowerCase();
+    if (cls === 'axe' || baseLower.includes('axe')) return 'assets/weapon-icons/axe_icon.png';
+    if (cls === 'sword' || baseLower.includes('blade') || baseLower.includes('sword')) return 'assets/weapon-icons/sword_icon.png';
+    if (cls === 'hammer' || baseLower.includes('hammer') || baseLower.includes('mace')) return 'assets/weapon-icons/hammer_icon.png';
+    if (cls === 'dagger' || baseLower.includes('dagger')) return 'assets/weapon-icons/dagger_icon.png';
+    if (cls === 'spear' || baseLower.includes('spear') || baseLower.includes('halberd')) return 'assets/weapon-icons/spear_icon.png';
+    if (cls === 'bow' || cls === 'crossbow' || baseLower.includes('bow') || baseLower.includes('crossbow') || baseLower.includes('arbalest')) return 'assets/weapon-icons/crossbow_icon.png';
+    return '';
+};
+const getItemIconPathShared = (item) => {
+    if (!item) return '';
+    if (item.type === 'weapon') return getWeaponIconPathShared(item);
+    if (item.type === 'armor') return getArmorIconPath(item);
+    if (item.type === 'trinket') return item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
+    if (item.type === 'potion') return 'assets/images/potion-icons/potion-icon.png';
+    return '';
 };
 
 const getArmorIconPath = (item) => {
@@ -255,6 +309,7 @@ class Player {
         this.skillPoints = 0;
         this.skills = {};
         this.tournamentsCompleted = 0;
+        this.injuries = [];
         // Combat potion slots: 3 configurable slots used per fight
         this.potionSlots = [null, null, null];
     }
@@ -271,6 +326,16 @@ class Player {
     getWeaponFamily() {
         return normalizeWeaponFamily(this.gear.weapon);
     }
+    getClassWeaponIdentity() {
+        const family = this.getWeaponFamily();
+        const cls = this.class;
+        if (cls === 'Warrior' && family === 'sword') return { label: 'Sword Duelist', dmgMult: 0.08, dodge: 4, hit: 4, def: 2 };
+        if (cls === 'Warrior' && family === 'crossbow') return { label: 'Crossbow Precision', dmgMult: 0.08, hit: 10, crit: 4 };
+        if (cls === 'Beserker' && family === 'axe') return { label: 'Axe Berserker', dmgMult: 0.12, crit: 8, dotChance_bleed: 0.08 };
+        if (cls === 'Beserker' && family === 'dagger') return { label: 'Dagger Venom', dmgMult: 0.08, dodge: 6, dotChance_poison: 0.08 };
+        if (cls === 'Guardian' && family === 'spear') return { label: 'Spear Controller', dmgMult: 0.08, def: 8, hit: 6, armorShred: 0.08 };
+        return { label: '', dmgMult: 0, dodge: 0, hit: 0, crit: 0, def: 0, armorShred: 0, dotChance_bleed: 0, dotChance_poison: 0, dotChance_burn: 0 };
+    }
     getConditionalSkillEffect(prefix) {
         const family = this.getWeaponFamily();
         return this.getSkillEffect(`${prefix}_${family}`);
@@ -283,6 +348,10 @@ class Player {
     }
     getSellMultiplierBonus() {
         return this.getSkillEffect('sellMult');
+    }
+    getInjuryPenalty(key) {
+        if (!Array.isArray(this.injuries)) return 0;
+        return this.injuries.reduce((sum, injury) => sum + ((injury.effects && typeof injury.effects[key] === 'number') ? injury.effects[key] : 0), 0);
     }
     // --- Class passives + gear stat mods helpers ---
     getGearStatBonus(key) {
@@ -306,7 +375,8 @@ class Player {
         if (this.class === 'Warrior') a += Math.floor(a / 3); // +1 ATK per 3 ATK
         a += this.getSkillEffect('atkFlat');
         a += this.getConditionalSkillEffect('atkWhile');
-        return a;
+        a -= this.getInjuryPenalty('atkFlatPenalty');
+        return Math.max(1, a);
     }
     getEffectiveVit() {
         let v = this.stats.vit + this.getGearStatBonus('vit');
@@ -314,7 +384,7 @@ class Player {
         return v;
     }
     getEffectiveDef() {
-        return this.stats.def + this.getGearStatBonus('def') + this.getConditionalSkillEffect('defWhile');
+        return Math.max(0, this.stats.def + this.getGearStatBonus('def') + this.getConditionalSkillEffect('defWhile') + (this.getClassWeaponIdentity().def || 0) - this.getInjuryPenalty('defFlatPenalty'));
     }
     getEffectiveMag() {
         return this.stats.mag + this.getGearStatBonus('mag');
@@ -329,16 +399,16 @@ class Player {
         return (this.class === 'Guardian') ? 1.2 : 1.0; // +20% max HP
     }
     getArmorMultiplier() {
-        return ((this.class === 'Guardian') ? 1.05 : 1.0) + this.getSkillEffect('armorMult');
+        return Math.max(0.4, ((this.class === 'Guardian') ? 1.05 : 1.0) + this.getSkillEffect('armorMult') - this.getInjuryPenalty('armorMultPenalty'));
     }
     getDodgeBonus() {
-        return ((this.class === 'Warrior') ? 8 : 0) + this.getConditionalSkillEffect('dodgeWhile');
+        return Math.max(0, ((this.class === 'Warrior') ? 8 : 0) + this.getConditionalSkillEffect('dodgeWhile') + (this.getClassWeaponIdentity().dodge || 0) - this.getInjuryPenalty('dodgePenalty'));
     }
     getHitBonus() {
-        return this.getSkillEffect('hitChance') + this.getConditionalSkillEffect('hitWhile');
+        return this.getSkillEffect('hitChance') + this.getConditionalSkillEffect('hitWhile') + (this.getClassWeaponIdentity().hit || 0) - this.getInjuryPenalty('hitChancePenalty');
     }
     getCritBonus() {
-        return ((this.class === 'Beserker') ? 10 : 0) + this.getSkillEffect('critChance') + this.getConditionalSkillEffect('critWhile');
+        return ((this.class === 'Beserker') ? 10 : 0) + this.getSkillEffect('critChance') + this.getConditionalSkillEffect('critWhile') + (this.getClassWeaponIdentity().crit || 0) - this.getInjuryPenalty('critChancePenalty');
     }
 
     getMaxHp() {
@@ -349,9 +419,9 @@ class Player {
         const base = 12 + (extraVit * 4) + (extraLvl * 6);
         const hp = Math.floor(base * this.getHpMultiplier());
         // Daha agresif progression için toplam HP'yi 3x ölçekle
-        return Math.max(12, hp * 3 + this.getSkillEffect('hpFlat'));
+        return Math.max(12, hp * 3 + this.getSkillEffect('hpFlat') - this.getInjuryPenalty('hpFlatPenalty'));
     }
-    getRegen() { return Math.floor(this.getEffectiveVit() / 2) + this.getSkillEffect('regenFlat'); }
+    getRegen() { return Math.max(0, Math.floor(this.getEffectiveVit() / 2) + this.getSkillEffect('regenFlat') - this.getInjuryPenalty('regenPenalty')); }
     getTotalArmor() {
         let total = 0;
         ARMOR_SLOTS.forEach(s => { if(this.gear[s]) total += this.gear[s].val; });
@@ -361,7 +431,7 @@ class Player {
     getDmgRange() {
         const w = this.gear.weapon;
         const strBonus = this.getEffectiveStr() * 2;
-        const familyMult = 1 + this.getConditionalSkillEffect('weaponDamageMult');
+        const familyMult = 1 + this.getConditionalSkillEffect('weaponDamageMult') + (this.getClassWeaponIdentity().dmgMult || 0);
         if(w) return { min: Math.max(1, Math.floor((w.min + strBonus) * familyMult)), max: Math.max(1, Math.floor((w.max + strBonus) * familyMult)) };
         return { min: 2 + strBonus, max: 4 + strBonus };
     }
@@ -509,7 +579,6 @@ const game = {
         let legendaryCount = 0;
         const countsByKey = Object.create(null);
         const weaponNames = Object.create(null);
-
         const getItemMinLevel = (item) => {
             if (!item) return 1;
             if (typeof item.minLevel === 'number') return item.minLevel;
@@ -519,7 +588,6 @@ const game = {
 
         const canUseItem = (item) => {
             if (!item) return false;
-            if (item.type === 'weapon' && lvl <= 4 && (item.rarityKey === 'epic' || item.rarityKey === 'legendary')) return false;
             if (item.type === 'weapon') {
                 const cleanName = String(item.name || '').trim().toLowerCase();
                 if (cleanName && weaponNames[cleanName]) return false;
@@ -921,6 +989,53 @@ const game = {
         const base = typeof item.price === 'number' ? item.price : 0;
         return Math.max(1, Math.round(base * (1 - discount)));
     },
+    resolveFightInjuries(fightContext) {
+        if (!this.player) return;
+        if (!Array.isArray(this.player.injuries)) this.player.injuries = [];
+        this.player.injuries = this.player.injuries
+            .map(injury => ({ ...injury, remainingFights: (injury.remainingFights || 0) - 1 }))
+            .filter(injury => injury.remainingFights > 0);
+        if (!fightContext) return;
+        const currentCount = this.player.injuries.length;
+        if (currentCount >= 2) return;
+        let chance = 0;
+        chance += Math.min(0.18, (fightContext.playerHpDamageTaken || 0) / 260);
+        chance += Math.min(0.12, (fightContext.criticalHitsTaken || 0) * 0.05);
+        if (fightContext.mode === 'duo') chance += 0.08;
+        if (fightContext.mode === 'no_armor') chance += 0.1;
+        if (fightContext.context && fightContext.context.source === 'tournament') chance += 0.06;
+        if (fightContext.defeat) chance += 0.08;
+        if (Math.random() > chance) return;
+        const activeIds = new Set(this.player.injuries.map(i => i.id));
+        const pool = INJURY_LIBRARY.filter(injury => !activeIds.has(injury.id));
+        if (!pool.length) return;
+        const picked = { ...pool[Math.floor(Math.random() * pool.length)] };
+        picked.remainingFights = picked.duration;
+        picked.source = (fightContext.lastEnemyName || 'Arena Trauma');
+        this.player.injuries.push(picked);
+        const msg = `Health Status updated: ${picked.name} (${picked.summary}) for ${picked.remainingFights} fights.`;
+        const hubMsg = $('hub-msg');
+        if (hubMsg) hubMsg.innerText = msg;
+    },
+    renderHealthStatus() {
+        const host = $('hub-health-status');
+        if (!host || !this.player) return;
+        const injuries = Array.isArray(this.player.injuries) ? this.player.injuries : [];
+        if (!injuries.length) {
+            host.innerHTML = `
+                <div class="health-status-title">Health Status</div>
+                <div class="health-status-stable">Stable</div>
+                <div class="health-status-copy">No lingering injuries. The body is ready for the next round.</div>
+            `;
+            return;
+        }
+        host.innerHTML = `
+            <div class="health-status-title">Health Status</div>
+            <div class="health-status-list">
+                ${injuries.map(injury => `<div class="health-status-card"><div class="health-status-name">${injury.name}</div><div class="health-status-effects">${injury.summary}</div><div class="health-status-duration">${injury.remainingFights} fights left</div></div>`).join('')}
+            </div>
+        `;
+    },
     updateTradeToggleUI() {
         const btn = $('btn-trade-toggle');
         if (!btn) return;
@@ -1003,7 +1118,7 @@ const game = {
             mode: this.currentPitMode,
             canRetreat: this.currentPitMode !== 'no_armor',
             xpEnabled: !this.isTournamentAvailable(),
-            rewardBonusText: this.currentPitMode === 'no_armor' ? '+35% Gold / XP' : (this.currentPitMode === 'duo' ? '+75% Gold / XP' : (this.isTournamentAvailable() ? 'Gold Only - tournament bracket awaits' : 'Base Gold / XP'))
+            rewardBonusText: this.currentPitMode === 'no_armor' ? '+35% Gold / XP' : (this.currentPitMode === 'duo' ? '+75% Gold / XP' : (this.isTournamentAvailable() ? 'Gold Only - tournament awaits' : 'Base Gold / XP'))
         });
     },
     getUnlockedTournamentTier() {
@@ -1017,25 +1132,35 @@ const game = {
     getNextTournamentTier() {
         return Math.max(1, (this.player?.tournamentsCompleted || 0) + 1);
     },
+    getTournamentTierMeta(tier) {
+        return TOURNAMENT_TIERS.find(entry => entry.tier === tier) || TOURNAMENT_TIERS[TOURNAMENT_TIERS.length - 1];
+    },
     createTournamentRounds(tier) {
         const baseLevel = Math.max(1, (this.player?.level || 1) + tier - 1);
         const totalRounds = Math.min(5 + Math.floor(tier / 2), 14);
+        const tierMeta = this.getTournamentTierMeta(tier);
         return Array.from({ length: totalRounds }, (_, i) => {
             const duoRounds = Math.min(1 + Math.floor(tier / 5), 4);
             const isDuoRound = i >= totalRounds - duoRounds;
             const isFinal = i === totalRounds - 1;
+            const enemyNames = isFinal && Array.isArray(tierMeta.final)
+                ? tierMeta.final.slice(0, isDuoRound && tier >= 2 ? 2 : 1)
+                : null;
             return {
                 source: 'tournament',
                 tournamentTier: tier,
+                tournamentName: tierMeta.name,
+                tournamentTheme: tierMeta.theme,
                 round: i + 1,
                 totalRounds,
-                label: `IRON CITY TOURNAMENT - ROUND ${i + 1}`,
+                label: `${tierMeta.name.toUpperCase()} - ROUND ${i + 1}`,
                 mode: isDuoRound && tier >= 2 ? 'duo' : 'duel',
                 canRetreat: false,
                 xpEnabled: false,
                 enemyLevel: baseLevel + i,
                 secondaryEnemyLevel: baseLevel + Math.max(0, i),
-                rewardBonusText: isFinal ? 'Final tournament payout on victory' : 'Advance to the next bracket'
+                rewardBonusText: isFinal ? 'Final tournament payout on victory' : 'Advance to the next round',
+                forcedEnemyNames: enemyNames
             };
         });
     },
@@ -1046,7 +1171,9 @@ const game = {
         const usedNames = new Set();
         for (let i = 0; i < enemyCount; i++) {
             const lvl = i === 1 ? (config.secondaryEnemyLevel || Math.max(1, (config.enemyLevel || this.player.level) - 1)) : (config.enemyLevel || this.player.level);
-            enemyGens.push(typeof generateEnemyTemplateForLevel === 'function' ? generateEnemyTemplateForLevel(lvl, usedNames) : null);
+            const gen = typeof generateEnemyTemplateForLevel === 'function' ? generateEnemyTemplateForLevel(lvl, usedNames) : null;
+            if (gen && Array.isArray(config.forcedEnemyNames) && config.forcedEnemyNames[i]) gen.displayName = config.forcedEnemyNames[i];
+            enemyGens.push(gen);
         }
         return enemyGens;
     },
@@ -1080,13 +1207,14 @@ const game = {
         if (!this.currentTournament || !this.player) return;
         const tier = this.currentTournament.tier;
         const rounds = this.currentTournament.rounds;
-        $('tournament-title').innerText = `IRON CITY TOURNAMENT TIER ${tier}`;
-        $('tournament-subtitle').innerText = `A locked bracket opens at level ${tier * 3}. Once you enter, every round must be fought to the end.`;
+        const tierMeta = this.getTournamentTierMeta(tier);
+        $('tournament-title').innerText = tierMeta.name;
+        $('tournament-subtitle').innerText = tierMeta.theme;
         $('tournament-summary').innerHTML = `
-            <div class="stat-row"><span>Bracket Tier</span><span class="text-gold">${tier}</span></div>
+            <div class="stat-row"><span>Tournament Tier</span><span class="text-gold">${tier}</span></div>
             <div class="stat-row"><span>Required Level</span><span class="text-red">${tier * 3}</span></div>
             <div class="stat-row"><span>Total Rounds</span><span>${rounds.length}</span></div>
-            <div class="stat-row"><span>Final Reward</span><span class="text-gold">Heavy Gold + XP payout</span></div>
+            <div class="stat-row"><span>Final Reward</span><span class="text-gold">Champion payout + trophy title</span></div>
             <div class="stat-row"><span>Retreat</span><span class="text-red">Disabled</span></div>
         `;
         $('tournament-roster').innerHTML = rounds.map((round, idx) => {
@@ -1127,7 +1255,7 @@ const game = {
         if (!this.player || !this.currentEncounter) return;
         const cfg = this.currentEncounter;
         $('encounter-title').innerText = cfg.label || 'ARENA MATCHUP';
-        $('encounter-subtitle').innerText = cfg.source === 'tournament' ? `Round ${cfg.round}/${cfg.totalRounds}. Inspect the opposition before you commit.` : 'Study the matchup before you commit.';
+        $('encounter-subtitle').innerText = cfg.source === 'tournament' ? `${cfg.tournamentTheme} Round ${cfg.round}/${cfg.totalRounds}.` : 'Study the matchup before you commit.';
         const retreatBtn = $('btn-encounter-retreat');
         const closeBtn = $('encounter-close');
         if (retreatBtn) {
@@ -1446,6 +1574,9 @@ const game = {
         $('ui-name').innerText = p.name; $('ui-lvl').innerText = p.level; $('ui-gold').innerText = p.gold;
         const avatarImg = $('ui-avatar');
         if (avatarImg) avatarImg.src = PLAYER_AVATAR_IMG;
+        const hasInjury = Array.isArray(p.injuries) && p.injuries.length > 0;
+        const profileCard = document.querySelector('.hub-profile-card');
+        if (profileCard) profileCard.classList.toggle('has-injury', hasInjury);
         // Hub XP bar under level label
         const xpNow = typeof p.xp === 'number' ? p.xp : 0;
         const xpMax = typeof p.xpMax === 'number' && p.xpMax > 0 ? p.xpMax : 100;
@@ -1785,6 +1916,14 @@ const game = {
             if (slot === 'shins') return 'assets/images/armor-icons/shins_icon.png';
             return '';
         };
+        const getItemIconPath = (item) => {
+            if (!item) return '';
+            if (item.type === 'weapon') return getWeaponIconPathShared(item);
+            if (item.type === 'armor') return getArmorIconPath(item);
+            if (item.type === 'trinket') return item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
+            if (item.type === 'potion') return 'assets/images/potion-icons/potion-icon.png';
+            return '';
+        };
         const buildPreviewFromItem = (item) => {
             if (!item || !previewBody) return;
             const rarityText = (item.rarity || '').replace('rarity-', '');
@@ -1846,7 +1985,7 @@ const game = {
             if (previewIcon) {
                 let iconPath = '';
                 if (item.type === 'weapon') {
-                    iconPath = getWeaponIconPath(item);
+                    iconPath = getWeaponIconPathShared(item);
                 } else if (item.type === 'armor') {
                     iconPath = getArmorIconPath(item);
                 } else if (item.type === 'trinket') {
@@ -2002,10 +2141,14 @@ const game = {
             const buyPrice = this.getAdjustedBuyPrice({ price });
             const disabled = qty <= 0 || this.player.gold < buyPrice;
             const btnState = disabled ? 'disabled' : '';
+            const iconPath = getItemIconPathShared({ type: 'potion' });
             row.innerHTML = `
-                <div class="item-main">
-                    <div class="item-main-name rarity-common">${tpl.name} <span class="potion-stock-count">x ${qty}</span></div>
-                    <div class="item-main-sub">Restores ${tpl.percent}% ${typeLabel.toLowerCase()} in combat.</div>
+                <div class="item-main-wrap">
+                    <div class="item-card-icon">${iconPath ? `<img src="${iconPath}" alt="">` : ''}</div>
+                    <div class="item-main">
+                        <div class="item-main-name rarity-common">${tpl.name} <span class="potion-stock-count">x ${qty}</span></div>
+                        <div class="item-main-sub">Restores ${tpl.percent}% ${typeLabel.toLowerCase()} in combat.</div>
+                    </div>
                 </div>
                 <div><span class="item-chip">Potion</span></div>
                 <div><span class="item-chip">${typeLabel}</span></div>
@@ -2264,7 +2407,7 @@ const game = {
             if (previewIcon) {
                 let iconPath = '';
                 if (item.type === 'weapon') {
-                    iconPath = getWeaponIconPath(item);
+                    iconPath = getWeaponIconPathShared(item);
                 } else if (item.type === 'armor') {
                     iconPath = getArmorIconPath(item);
                 } else if (item.type === 'trinket') {
@@ -2317,11 +2460,15 @@ const game = {
                 const badgeMarkup = this.getItemBadgeMarkup(equipped);
                 const row = document.createElement('div');
                 row.className = 'item-row';
+                const iconPath = getItemIconPathShared(equipped);
                 row.innerHTML = `
-                    <div class="item-main">
-                        <div class="item-main-name ${equipped.rarity}">${baseName}${nameSuffix}</div>
-                        ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
-                        <div class="item-main-sub">Equipped in ${title}${isWeapon ? ` • ${equipped.min}-${equipped.max} damage` : equipped.type === 'armor' ? ` • ${equipped.val} armor` : ''}</div>
+                    <div class="item-main-wrap">
+                        <div class="item-card-icon">${iconPath ? `<img src="${iconPath}" alt="">` : ''}</div>
+                        <div class="item-main">
+                            <div class="item-main-name ${equipped.rarity}">${baseName}${nameSuffix}</div>
+                            ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
+                            <div class="item-main-sub">Equipped in ${title}${isWeapon ? ` • ${equipped.min}-${equipped.max} damage` : equipped.type === 'armor' ? ` • ${equipped.val} armor` : ''}</div>
+                        </div>
                     </div>
                     <div><span class="item-chip">${equipped.rarity.replace('rarity-','')}</span></div>
                     <div><span class="item-chip">${getDisplayItemType(equipped)}</span></div>
@@ -2427,12 +2574,16 @@ const game = {
             const lvlColor = lvlOk ? '#ccc' : '#f44336';
             const lvlHtml = `<span style="color:${lvlColor};">${minLvl}</span>`;
             const badgeMarkup = this.getItemBadgeMarkup(item);
+            const iconPath = getItemIconPathShared(item);
 
             div.innerHTML = `
-                <div class="item-main">
-                    <div class="item-main-name ${item.rarity}">${nameHtml}</div>
-                    ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
-                    <div class="item-main-sub">${statDisplay}${diffHtml}</div>
+                <div class="item-main-wrap">
+                    <div class="item-card-icon">${iconPath ? `<img src="${iconPath}" alt="">` : ''}</div>
+                    <div class="item-main">
+                        <div class="item-main-name ${item.rarity}">${nameHtml}</div>
+                        ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
+                        <div class="item-main-sub">${statDisplay}${diffHtml}</div>
+                    </div>
                 </div>
                 <div><span class="item-chip">${item.rarity.replace('rarity-','')}</span></div>
                 <div><span class="item-chip">${getDisplayItemType(item)}</span></div>
@@ -2685,6 +2836,7 @@ const game = {
                 fixStarterRustyBlade(it);
             });
         }
+        if (!Array.isArray(this.player.injuries)) this.player.injuries = [];
 
         // Shop state'ini kayıttan geri yükle (yoksa defaultla)
         if (plain._shopStock) {
@@ -2778,6 +2930,7 @@ const game = {
         this.ensurePreviewHelpers();
         if (this.player) {
             const p = this.player;
+            const identity = p.getClassWeaponIdentity();
             const effStr = p.getEffectiveStr();
             const effAtk = p.getEffectiveAtk();
             const effVit = p.getEffectiveVit();
@@ -2800,6 +2953,18 @@ const game = {
             const guardianVitPassive = p.class === 'Guardian' ? Math.floor((p.stats.vit + gearVit) / 3) : 0;
             const warriorAtkPassive = p.class === 'Warrior' ? Math.floor((p.stats.atk + gearAtk) / 3) : 0;
             const berserkerStrPassive = p.class === 'Beserker' ? Math.floor((p.stats.str + gearStr) / 3) : 0;
+            const skillAtk = p.getSkillEffect('atkFlat') + p.getConditionalSkillEffect('atkWhile') + (identity.atk || 0);
+            const skillDef = p.getConditionalSkillEffect('defWhile') + (identity.def || 0);
+            const skillHit = p.getSkillEffect('hitChance') + p.getConditionalSkillEffect('hitWhile') + (identity.hit || 0);
+            const skillCrit = p.getSkillEffect('critChance') + p.getConditionalSkillEffect('critWhile') + (identity.crit || 0);
+            const skillHp = p.getSkillEffect('hpFlat');
+            const skillRegen = p.getSkillEffect('regenFlat');
+            const injuryAtk = p.getInjuryPenalty('atkFlatPenalty');
+            const injuryDef = p.getInjuryPenalty('defFlatPenalty');
+            const injuryHit = p.getInjuryPenalty('hitChancePenalty');
+            const injuryCrit = p.getInjuryPenalty('critChancePenalty');
+            const injuryHp = p.getInjuryPenalty('hpFlatPenalty');
+            const injuryRegen = p.getInjuryPenalty('regenPenalty');
             const weapon = p.gear.weapon;
             const weaponMin = weapon ? weapon.min : 2;
             const weaponMax = weapon ? weapon.max : 4;
@@ -2833,6 +2998,8 @@ const game = {
                     <div id="stat-combat-armor" class="stat-row stat-hover-row"><span>Armor</span><span class="text-shield">${armor}</span></div>
                     <div id="stat-combat-dmg" class="stat-row stat-hover-row"><span>Melee Damage</span><span class="text-orange">${dmg.min}-${dmg.max}</span></div>
                     <div id="stat-combat-regen" class="stat-row stat-hover-row"><span>Regen / Turn</span><span class="text-green">${regen}</span></div>
+                    ${identity.label ? `<div class="stat-row"><span>Build Identity</span><span class="text-gold">${identity.label}</span></div>` : ''}
+                    <div class="hub-stats-divider"></div><h3 class="hub-stats-title">Health Status</h3>${Array.isArray(p.injuries) && p.injuries.length ? p.injuries.map(injury => `<div class="stat-row"><span>${injury.name}</span><span class="text-red">${injury.remainingFights} fights</span></div><div style="color:#a8a8b0; font-size:0.84rem; margin:-2px 0 8px 0;">${injury.summary}</div>`).join('') : `<div style="color:#9ed3ff; font-size:0.92rem;">Stable</div><div style="color:#a8a8b0; font-size:0.84rem; margin-top:4px;">No lingering injuries.</div>`}
                 `;
             }
             if (summary) {
@@ -2845,15 +3012,15 @@ const game = {
             const movePreview = this._moveItemPreview;
             const hoverMap = {
                 'stat-core-str': `<div class="shop-preview-title">Strength Breakdown</div><div>Base: <span class="text-orange">${p.stats.str}</span></div><div>Gear Bonus: <span class="text-orange">${gearStr >= 0 ? '+' : ''}${gearStr}</span></div><div>Class Passive: <span class="text-orange">${berserkerStrPassive >= 0 ? '+' : ''}${berserkerStrPassive}</span></div><div style="margin-top:6px; color:#aaa;">Every point contributes <span class="text-orange">+2</span> melee damage.</div>`,
-                'stat-core-atk': `<div class="shop-preview-title">Attack Breakdown</div><div>Base: <span class="text-red">${p.stats.atk}</span></div><div>Gear Bonus: <span class="text-red">${gearAtk >= 0 ? '+' : ''}${gearAtk}</span></div><div>Class Passive: <span class="text-red">${warriorAtkPassive >= 0 ? '+' : ''}${warriorAtkPassive}</span></div><div style="margin-top:6px; color:#aaa;">Raises hit chance and crit chance in combat.</div>`,
-                'stat-core-def': `<div class="shop-preview-title">Defence Breakdown</div><div>Base: <span class="text-blue">${p.stats.def}</span></div><div>Gear Bonus: <span class="text-blue">${gearDef >= 0 ? '+' : ''}${gearDef}</span></div><div style="margin-top:6px; color:#aaa;">Reduces enemy hit chance against you.</div>`,
+                'stat-core-atk': `<div class="shop-preview-title">Attack Breakdown</div><div>Base: <span class="text-red">${p.stats.atk}</span></div><div>Gear Bonus: <span class="text-red">${gearAtk >= 0 ? '+' : ''}${gearAtk}</span></div><div>Class Passive: <span class="text-red">${warriorAtkPassive >= 0 ? '+' : ''}${warriorAtkPassive}</span></div><div>Skill / Identity Bonus: <span class="text-red">${skillAtk >= 0 ? '+' : ''}${skillAtk}</span></div><div>Injury Penalty: <span class="text-red">-${injuryAtk}</span></div><div style="margin-top:6px; color:#aaa;">Raises hit chance and crit chance in combat.</div>`,
+                'stat-core-def': `<div class="shop-preview-title">Defence Breakdown</div><div>Base: <span class="text-blue">${p.stats.def}</span></div><div>Gear Bonus: <span class="text-blue">${gearDef >= 0 ? '+' : ''}${gearDef}</span></div><div>Skill / Identity Bonus: <span class="text-blue">${skillDef >= 0 ? '+' : ''}${skillDef}</span></div><div>Injury Penalty: <span class="text-red">-${injuryDef}</span></div><div style="margin-top:6px; color:#aaa;">Reduces enemy hit chance against you.</div>`,
                 'stat-core-vit': `<div class="shop-preview-title">Vitality Breakdown</div><div>Base: <span class="text-green">${p.stats.vit}</span></div><div>Gear Bonus: <span class="text-green">${gearVit >= 0 ? '+' : ''}${gearVit}</span></div><div>Class Passive: <span class="text-green">${guardianVitPassive >= 0 ? '+' : ''}${guardianVitPassive}</span></div><div style="margin-top:6px; color:#aaa;">Drives max health and regeneration.</div>`,
                 'stat-core-mag': `<div class="shop-preview-title">Magicka Breakdown</div><div>Base: <span class="text-purple">${p.stats.mag}</span></div><div>Gear Bonus: <span class="text-purple">${gearMag >= 0 ? '+' : ''}${gearMag}</span></div><div style="margin-top:6px; color:#aaa;">Reserved for future spells and special systems.</div>`,
                 'stat-core-chr': `<div class="shop-preview-title">Charisma Breakdown</div><div>Base: <span class="text-gold">${p.stats.chr ?? 0}</span></div><div>Gear Bonus: <span class="text-gold">${gearChr >= 0 ? '+' : ''}${gearChr}</span></div><div style="margin-top:6px; color:#aaa;">Improves economy and combat rewards.</div>`,
-                'stat-combat-hp': `<div class="shop-preview-title">Health Formula</div><div>Base Health Seed: <span class="text-red">12</span></div><div>Vitality Contribution: <span class="text-red">${Math.max(0, effVit - 1)} x 4 = ${Math.max(0, effVit - 1) * 4}</span></div><div>Level Contribution: <span class="text-red">${Math.max(0, (p.level || 1) - 1)} x 6 = ${Math.max(0, (p.level || 1) - 1) * 6}</span></div><div>Class Multiplier: <span class="text-red">x${hpMultiplier.toFixed(2)}</span></div><div>Final 3x Scaling: <span class="text-red">${hp}</span></div>`,
-                'stat-combat-armor': `<div class="shop-preview-title">Armor Breakdown</div><div>Equipped Piece Total: <span class="text-shield">${rawArmor}</span></div><div>Class Multiplier: <span class="text-shield">x${armorMultiplier.toFixed(2)}</span></div><div style="margin-top:6px;">Final Armor: <span class="text-shield">${armor}</span></div>`,
-                'stat-combat-dmg': `<div class="shop-preview-title">Melee Damage Breakdown</div><div>Weapon Base: <span class="text-orange">${weaponMin}-${weaponMax}</span>${weapon ? ` <span style="color:#aaa;">(${weapon.name})</span>` : ' <span style="color:#aaa;">(unarmed)</span>'}</div><div>Strength Bonus: <span class="text-orange">+${strDamageBonus}</span> to min and max</div><div style="margin-top:6px;">Final Damage: <span class="text-orange">${dmg.min}-${dmg.max}</span></div>`,
-                'stat-combat-regen': `<div class="shop-preview-title">Regeneration Formula</div><div>Effective Vitality: <span class="text-green">${effVit}</span></div><div>Formula: <span class="text-green">floor(VIT / 2)</span></div><div style="margin-top:6px;">Regen Per Turn: <span class="text-green">${regen}</span></div>`
+                'stat-combat-hp': `<div class="shop-preview-title">Health Formula</div><div>Base Health Seed: <span class="text-red">12</span></div><div>Vitality Contribution: <span class="text-red">${Math.max(0, effVit - 1)} x 4 = ${Math.max(0, effVit - 1) * 4}</span></div><div>Level Contribution: <span class="text-red">${Math.max(0, (p.level || 1) - 1)} x 6 = ${Math.max(0, (p.level || 1) - 1) * 6}</span></div><div>Class Multiplier: <span class="text-red">x${hpMultiplier.toFixed(2)}</span></div><div>Skill Bonus: <span class="text-red">+${skillHp}</span></div><div>Injury Penalty: <span class="text-red">-${injuryHp}</span></div><div>Final 3x Scaling: <span class="text-red">${hp}</span></div>`,
+                'stat-combat-armor': `<div class="shop-preview-title">Armor Breakdown</div><div>Equipped Piece Total: <span class="text-shield">${rawArmor}</span></div><div>Class / Skill Multiplier: <span class="text-shield">x${armorMultiplier.toFixed(2)}</span></div><div>Injury Penalty: <span class="text-red">-${Math.round(p.getInjuryPenalty('armorMultPenalty') * 100)}%</span></div><div style="margin-top:6px;">Final Armor: <span class="text-shield">${armor}</span></div>`,
+                'stat-combat-dmg': `<div class="shop-preview-title">Melee Damage Breakdown</div><div>Weapon Base: <span class="text-orange">${weaponMin}-${weaponMax}</span>${weapon ? ` <span style="color:#aaa;">(${weapon.name})</span>` : ' <span style="color:#aaa;">(unarmed)</span>'}</div><div>Strength Bonus: <span class="text-orange">+${strDamageBonus}</span> to min and max</div><div>Skill / Identity Multiplier: <span class="text-orange">x${(1 + p.getConditionalSkillEffect('weaponDamageMult') + (identity.dmgMult || 0)).toFixed(2)}</span></div><div style="margin-top:6px;">Final Damage: <span class="text-orange">${dmg.min}-${dmg.max}</span></div>`,
+                'stat-combat-regen': `<div class="shop-preview-title">Regeneration Formula</div><div>Effective Vitality: <span class="text-green">${effVit}</span></div><div>Formula: <span class="text-green">floor(VIT / 2)</span></div><div>Skill Bonus: <span class="text-green">+${skillRegen}</span></div><div>Injury Penalty: <span class="text-red">-${injuryRegen}</span></div><div>Hit Bonus Total: <span class="text-green">+${skillHit}</span></div><div>Crit Bonus Total: <span class="text-green">+${skillCrit}</span></div><div style="margin-top:6px;">Regen Per Turn: <span class="text-green">${regen}</span></div>`
             };
             if (previewBox && previewBody && typeof movePreview === 'function') {
                 Object.keys(hoverMap).forEach(id => {
@@ -3258,6 +3425,10 @@ const combat = {
     _lagTimers: {},
     _lastBarPct: {},
     mode: 'duel',
+    injuryRisk: 0,
+    criticalHitsTaken: 0,
+    playerHpDamageTaken: 0,
+    lastEnemyName: '',
     getLivingEnemies() {
         return Array.isArray(this.enemies) ? this.enemies.filter(e => e && e.hp > 0) : [];
     },
@@ -3453,6 +3624,10 @@ const combat = {
         this.dotResist = {};
         this._lagTimers = {};
         this._lastBarPct = {};
+        this.injuryRisk = 0;
+        this.criticalHitsTaken = 0;
+        this.playerHpDamageTaken = 0;
+        this.lastEnemyName = '';
 
         // Prepare combat potion slots for this fight.
         // Inventory reservation is handled when assigning slots in inventory.
@@ -4123,7 +4298,8 @@ const combat = {
         const affix = weapon.dotAffix;
         const effectId = affix.effect;
         if (!effectId || !STATUS_EFFECTS_CONFIG.effects[effectId]) return;
-        const bonusChance = attacker instanceof Player ? attacker.getSkillEffect(`dotChance_${effectId}`) : 0;
+        const identity = attacker instanceof Player ? attacker.getClassWeaponIdentity() : null;
+        const bonusChance = attacker instanceof Player ? attacker.getSkillEffect(`dotChance_${effectId}`) + (identity && identity[`dotChance_${effectId}`] ? identity[`dotChance_${effectId}`] : 0) : 0;
         const finalChance = Math.min(0.95, (affix.chance || 0) + bonusChance);
         if ((rng(0, 100) / 100) > finalChance) return;
         const bonusDamage = attacker instanceof Player ? attacker.getSkillEffect(`dotDamage_${effectId}`) : 0;
@@ -4328,6 +4504,8 @@ const combat = {
             const armorDmg = Math.min(armorBefore, amount);
             const hpDmg = rem;
             this.hp -= hpDmg; if(this.hp < 0) this.hp = 0;
+            this.playerHpDamageTaken += hpDmg;
+            this.injuryRisk += hpDmg + Math.floor(armorDmg * 0.25);
             if(armorDmg > 0) playSfx('armorHit');
             if(hpDmg > 0) {
                 this.flashBlood();
@@ -4576,7 +4754,7 @@ const combat = {
                                 dmg = Math.floor(dmg * 1.5);
                             }
                         }
-                        const shred = p.getConditionalSkillEffect('armorShredWhile');
+                        const shred = p.getConditionalSkillEffect('armorShredWhile') + (p.getClassWeaponIdentity().armorShred || 0);
                         if (targetEnemy && shred > 0 && targetEnemy.armor > 0) {
                             const shredAmt = Math.max(0, Math.floor(targetEnemy.armor * shred));
                             if (shredAmt > 0) {
@@ -4680,6 +4858,8 @@ const combat = {
                                 isCrit = true;
                                 dmg = Math.floor(dmg * 1.5);
                             }
+                            if (isCrit || isDisastrous) this.criticalHitsTaken += isDisastrous ? 2 : 1;
+                            this.lastEnemyName = e.name;
                             this.takeDamage(dmg, 'player');
                             this.applyWeaponOnHitEffects(e, e.weapon, 'player');
                             this.showDmg(dmg, 'player', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
@@ -4750,9 +4930,9 @@ const combat = {
         const baseGold = 30 + (totalEnemyLevels * 12);
         const baseXp = 70 + (totalEnemyLevels * 20);
         const chr = p.getEffectiveChr();
-        let rewardMult = 1 + chr * 0.025 + p.getRewardMultiplierBonus();
-        if (this.mode === 'no_armor') rewardMult += 0.35;
-        if (this.mode === 'duo') rewardMult += 0.75;
+        let rewardMult = 1 + chr * 0.022 + p.getRewardMultiplierBonus();
+        if (this.mode === 'no_armor') rewardMult += 0.25;
+        if (this.mode === 'duo') rewardMult += 0.55;
 
         // Trinketlerden gelen ekstra gold/xp çarpanları
         let goldBonus = 0;
@@ -4777,27 +4957,44 @@ const combat = {
             xp = 0;
         }
         let victorySubtitle = 'Enemy Defeated.';
+        let tournamentBannerText = '';
         if (inTournament) {
             const isFinalRound = game.currentTournament.index >= game.currentTournament.rounds.length - 1;
             if (!isFinalRound) {
                 victorySubtitle = `Round ${game.currentTournament.index + 1} cleared. Advance to the next opponent.`;
+                tournamentBannerText = `The tournament tightens. Prepare for round ${game.currentTournament.index + 2}.`;
             } else {
-                gold += Math.floor((220 + game.currentTournament.tier * 140) * (1 + chr * 0.02));
-                xp += Math.floor((260 + game.currentTournament.tier * 180) * (1 + chr * 0.02));
+                gold += Math.floor((160 + game.currentTournament.tier * 110) * (1 + chr * 0.018));
+                xp += Math.floor((200 + game.currentTournament.tier * 145) * (1 + chr * 0.018));
                 p.tournamentsCompleted = Math.max(p.tournamentsCompleted || 0, game.currentTournament.tier);
                 victorySubtitle = `Iron City Tournament conquered. The city remembers your name.`;
+                const tierMeta = game.getTournamentTierMeta(game.currentTournament.tier);
+                tournamentBannerText = `${tierMeta.name} is yours. The crowd crowns you with the title of champion.`;
             }
         } else if (tournamentAvailable && xp === 0) {
-            victorySubtitle = 'Gold earned. Tournament bracket now withholds pit XP.';
+            victorySubtitle = 'Gold earned. Tournament progression now withholds pit XP.';
         }
         // Victory ekranını X animasyonundan ~2.5sn sonra göster
         setTimeout(() => {
+            game.resolveFightInjuries({
+                mode: this.mode,
+                context: this.context,
+                playerHpDamageTaken: this.playerHpDamageTaken,
+                criticalHitsTaken: this.criticalHitsTaken,
+                lastEnemyName: this.lastEnemyName,
+                defeat: false
+            });
             p.gold += gold; p.xp += xp;
             // Dövüş bittiğinde kullanılmayan potları envantere geri döndür
             this.returnUnusedPotions();
             $('modal-victory').classList.remove('hidden');
             const subtitleEl = $('victory-subtitle');
             if (subtitleEl) subtitleEl.innerText = victorySubtitle;
+            const tournamentBanner = $('victory-tournament-banner');
+            if (tournamentBanner) {
+                tournamentBanner.innerText = tournamentBannerText;
+                tournamentBanner.classList.toggle('hidden', !tournamentBannerText);
+            }
             this.animateVal('vic-gold',0,gold,1000); this.animateVal('vic-xp',0,xp,1000);
             // update XP labels around the bar
             $('vic-xp-gain').innerText = xp;
@@ -4873,6 +5070,16 @@ game.handlePlayerDeath = function() {
     // Aynı ölüm sekansında birden fazla tetiklenmesini engelle
     if (this._deathInProgress) return;
     this._deathInProgress = true;
+    if (window.combat) {
+        this.resolveFightInjuries({
+            mode: combat.mode,
+            context: combat.context,
+            playerHpDamageTaken: combat.playerHpDamageTaken,
+            criticalHitsTaken: combat.criticalHitsTaken,
+            lastEnemyName: combat.lastEnemyName,
+            defeat: true
+        });
+    }
 
     const before = this.player.gold || 0;
     const lost = Math.floor(before * 0.4);

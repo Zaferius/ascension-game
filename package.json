@@ -1,0 +1,11 @@
+{
+  "name": "ascension-multiplayer-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "multiplayer": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
