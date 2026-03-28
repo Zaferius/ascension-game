@@ -3,9 +3,20 @@
 -1. turnuva sırasında tam 3 level atladıgım icin 1. turnuva biter bitmez diğerine girmeye hak kazandım. Bunu biraz dengelemek lazım. 
 -Pot fiyatları?? Test et para hilesi yapmadan.
 -Attack puanım 1 olmasına ragmen oldukca fazla vurus ihtimaline sahibim. bunu biraz nerfleyelim.
--Dungeonlarda dinamik efektler(oda gecislerinde blur shake falan filan. canlı hissettirsin.)
--dungeonda ölen düsmanların loot bırakması ve envanter(Bag) yönetimi.
+
 -Achivements.
+-Player'in atagı 12 iken düsmanın defansı 6. fakat player'ın vurus ihtimalleri cok fazla. 99 85 73
+-Karısımza her zaman aynı level adam cıkmasın bir azı da çıkabilsin 2 fazlası da cıkabilsin. o civarda değişsin.
+-Özelligi olmayan common silahların, aynı level özellikli özel silahlara kıyasla ciddi düsük ücretli olması lazım.
+
+
+##DUNGEONS
+-Dungeonlarda dinamik efektler(oda gecislerinde blur shake falan filan. canlı hissettirsin.)
+-Dungeonda ölen düsmanların loot bırakması(levellara falan uygun drop düsürmesi lazım. silah,armor,trinket,combat store itemleri,potlar,gold) ve envanter(Bag) yönetimi.
+-Dungeon sistemini Section section ayıracagız 1-6 level arası 7 -13 lvl arası gibi.. Dungeon zorluk dengesi buna göre gitmeli düzgün olmalı.
+-Dungeon aşırı zor. Test ve düzenleme gerekiyor.
+
+
 
 
 -perhance enemy avatar seed: //// (seed:::876714083)

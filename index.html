@@ -515,6 +515,39 @@
                     <div id="dungeon-room-actions" class="dungeon-room-actions"></div>
                 </div>
             </div>
+            <div class="dungeon-layout">
+                <div class="dungeon-map-panel">
+                    <div class="dungeon-map-head">
+                        <h3>Section Intel</h3>
+                        <div id="dungeon-section-range" class="dungeon-section-range">Lv. 1-6</div>
+                    </div>
+                    <div class="dungeon-section-card">
+                        <div class="dungeon-section-kicker">Current Bracket</div>
+                        <div id="dungeon-section-title" class="dungeon-section-title">Section 1 - The Shallows</div>
+                        <p id="dungeon-section-copy" class="dungeon-section-copy">Collapsed cells and weak scavengers.</p>
+                        <div class="dungeon-section-progress"><div id="dungeon-section-progress-fill" class="dungeon-section-progress-fill"></div></div>
+                        <div class="dungeon-section-stats">
+                            <div class="dungeon-section-stat"><span>Threat</span><strong id="dungeon-section-threat">Measured</strong></div>
+                            <div class="dungeon-section-stat"><span>Loot Focus</span><strong id="dungeon-section-loot">Starter gear and curatives</strong></div>
+                        </div>
+                    </div>
+                    <div class="dungeon-feed-wrap">
+                        <div class="dungeon-feed-headline">Recent Haul</div>
+                        <div id="dungeon-loot-feed" class="dungeon-loot-feed"></div>
+                    </div>
+                </div>
+                <div class="dungeon-room-panel">
+                    <div class="dungeon-bag-head">
+                        <div>
+                            <div class="dungeon-room-kicker" style="margin-bottom:8px;">Battle Bag</div>
+                            <h3 style="margin:0;">Consumables Ready</h3>
+                        </div>
+                        <div id="dungeon-bag-meta" class="dungeon-section-range">0 / 8 prepared</div>
+                    </div>
+                    <p id="dungeon-bag-caption" class="dungeon-bag-caption">Looted potions and remedies can be packed here before the next room.</p>
+                    <div id="dungeon-bag-grid" class="dungeon-bag-grid"></div>
+                </div>
+            </div>
             <div id="dungeon-player-strip" class="dungeon-player-strip"></div>
         </div>
     </div>
@@ -577,6 +610,15 @@
             </div>
 
             <div id="victory-tournament-banner" class="victory-tournament-banner hidden"></div>
+            <div id="victory-dungeon-loot" class="victory-dungeon-loot hidden">
+                <div class="victory-dungeon-loot-head">
+                    <div>
+                        <div class="victory-reward-label">Dungeon Loot</div>
+                        <div id="victory-dungeon-loot-meta" class="victory-dungeon-loot-meta"></div>
+                    </div>
+                </div>
+                <div id="victory-dungeon-loot-grid" class="victory-dungeon-loot-grid"></div>
+            </div>
 
             <button class="btn btn-primary victory-continue-btn" id="vic-continue-btn" onclick="game.closeVictory()">CONTINUE</button>
         </div>

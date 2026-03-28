@@ -25,7 +25,7 @@ This document is written for both humans and AI agents so the project can be und
 Core loop:
 
 1. Create a gladiator
-2. Fight in the pit or tournaments
+2. Fight in the pit, tournaments, or dungeon runs
 3. Earn gold, XP, and loot
 4. Upgrade equipment and stats
 5. Unlock skills and manage injuries
@@ -116,9 +116,12 @@ Located in `scripts/modules/`.
 
 - `save_load.js` - save slots and persistence
 - `shop.js` - shop stock generation, trading, potion inventory logic
+- `dungeon.js` - dungeon crawling flow, room text, branching choices, room rewards
 - `encounter.js` - pit setup, previews, tournaments, injuries
 - `combat.js` - turn-based combat engine
-- `blackjack.js` - side activity/minigame
+- `blackjack.js` - blackjack gambling minigame
+- `texas_holdem.js` - Texas Hold'em gambling minigame
+- `gamble.js` - gamble hall selection flow and modal state controller
 
 ### Multiplayer backend
 
@@ -157,6 +160,7 @@ It is composed by merging module objects:
 const game = {
     ...gameSaveLoad,
     ...gameShop,
+    ...gameDungeon,
     ...gameEncounter,
     player: null,
     // UI and flow methods...
@@ -241,17 +245,19 @@ When balancing the game, keep this separation intact.
 
 ---
 
-## 8. Encounters, Pit, and Tournaments
+## 8. Encounters, Pit, Tournaments, and Dungeons
 
-`scripts/modules/encounter.js` controls the progression layer around combat.
+`scripts/modules/encounter.js` and `scripts/modules/dungeon.js` control the progression layer around combat.
 
-It manages:
+They manage:
 
 - pit mode selection
 - encounter preview UI
 - enemy preview calculations
 - tournament unlock rules
 - tournament round generation
+- dungeon room generation and branching path flow
+- dungeon scene text and room-to-room decision logic
 - injury application after fights
 
 Current encounter types:
@@ -266,6 +272,16 @@ Tournament behavior:
 - tier progression is tracked with `tournamentsCompleted`
 - each tier generates a sequence of rounds
 - later rounds can force named enemies and 1v2 fights
+
+Dungeon behavior:
+
+- dungeon flow lives in `scripts/modules/dungeon.js`
+- runs are text-driven and choice-based rather than map-driven
+- rooms can branch into multiple passages such as left, center, or right
+- room types currently include combat, elite, event, rest, treasure, and boss
+- combat rooms skip the normal encounter preview and drop directly into battle after in-room narration
+- once a dungeon run is abandoned or the game is reloaded, that run is discarded and must be restarted
+- dungeon progression tracks permanent player milestones such as `dungeonsCompleted` and `deepestDungeonDepth`
 
 ---
 
@@ -324,7 +340,42 @@ Rule of thumb:
 
 ---
 
-## 11. Injury System
+## 11. Gambling System
+
+The city hub now includes a shared `GAMBLE` flow with multiple casino-style minigames.
+
+Main files:
+
+- `scripts/modules/gamble.js` - opens the gamble hall, switches selected game, and launches the chosen table
+- `scripts/modules/blackjack.js` - handles blackjack rules, betting, dealing, hit/stand flow, and payout resolution
+- `scripts/modules/texas_holdem.js` - handles Texas Hold'em table flow, betting, board reveals, raise/fold/check actions, and showdown evaluation
+
+Current UX flow:
+
+1. Player clicks `GAMBLE` from the hub
+2. `GAMBLE HALL` modal opens with game selection tabs
+3. Player chooses `BLACKJACK` or `TEXAS HOLD'EM`
+4. Player clicks the lobby `DEAL` button to enter that table
+5. Betting is done inside the active game table, not before entering
+
+Current implementation details:
+
+- the gamble hall is a shared modal shell in `index.html`
+- game selection is handled before entering a table
+- each game has its own in-table betting UI inside the green felt play area
+- blackjack locks input after hand resolution and shows `PLAY AGAIN`
+- Texas Hold'em supports variable raise amounts instead of a fixed raise step
+- both games update player gold and persist through the normal save flow
+
+When extending the gambling feature:
+
+- keep lobby selection in `gamble.js`
+- keep game-specific rules inside each minigame module
+- avoid mixing gambling state into combat or shop systems
+
+---
+
+## 12. Injury System
 
 Injury definitions live in `scripts/config/injuries.js`.
 
@@ -344,7 +395,7 @@ This is an important balancing system because it adds consequences beyond a sing
 
 ---
 
-## 12. Save System
+## 13. Save System
 
 Single-player saves use browser `localStorage`.
 
@@ -361,6 +412,11 @@ The save system stores more than the player object. It also persists run-specifi
 - shop refresh counters
 - last active slot
 
+Important current dungeon rule:
+
+- active dungeon runs are intentionally not resumed from saves
+- dungeon progress is temporary by design, but permanent dungeon completion stats on the player still persist
+
 The loader also contains migration logic for older saves, so be careful when changing save structure.
 
 Best practice when adding new player fields:
@@ -371,7 +427,7 @@ Best practice when adding new player fields:
 
 ---
 
-## 13. Multiplayer Prototype
+## 14. Multiplayer Prototype
 
 Multiplayer is currently an isolated alpha feature, not the full long-term architecture.
 
@@ -411,7 +467,7 @@ For future direction, see `ASCENSION-MultiplayerPlan.md`.
 
 ---
 
-## 14. Current Design Philosophy
+## 15. Current Design Philosophy
 
 The project currently follows these practical rules:
 
@@ -424,7 +480,7 @@ The project currently follows these practical rules:
 
 ---
 
-## 15. AI Development Guide
+## 16. AI Development Guide
 
 If you are an AI agent continuing work on this project, use these rules first.
 
@@ -441,6 +497,7 @@ If you are an AI agent continuing work on this project, use these rules first.
 - new player stat logic -> `scripts/core/player.js`
 - new fight rule -> `scripts/modules/combat.js`
 - new encounter/tournament rule -> `scripts/modules/encounter.js`
+- new dungeon crawl flow or room logic -> `scripts/modules/dungeon.js`
 - new shop/item behavior -> `scripts/modules/shop.js` and data catalogs
 - new content definitions -> `scripts/config/` or `scripts/data/`
 - new UI screens/buttons -> `index.html`, `gladiator_game.js`, `gladiator_game.css`
@@ -463,7 +520,7 @@ If you are an AI agent continuing work on this project, use these rules first.
 
 ---
 
-## 16. Known Project Constraints
+## 17. Known Project Constraints
 
 - No bundler
 - No automated tests
@@ -482,7 +539,7 @@ This means regressions are most likely to come from:
 
 ---
 
-## 17. Good Next Improvements
+## 18. Good Next Improvements
 
 Based on the current codebase and `TODO.md`, strong next candidates are:
 
@@ -490,11 +547,12 @@ Based on the current codebase and `TODO.md`, strong next candidates are:
 - balance tuning for attack/hit scaling and potion economy
 - better tournament pacing and level gating
 - more item/status utility such as bandage-style bleed counterplay
+- expanded gambling tables, AI behavior, and payout tuning
 - further multiplayer expansion toward the persistent-world plan
 
 ---
 
-## 18. Recent UI Updates
+## 19. Recent UI Updates
 
 The project recently received a round of UI/UX improvements that AI agents should be aware of before making layout changes.
 
@@ -527,9 +585,29 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 
 - default browser white/gray scrollbars were replaced with a darker theme that better matches the game's visual style
 
+### Gamble hall and casino UI
+
+- the old single-game gambling flow was expanded into a shared `GAMBLE HALL`
+- players now choose between `Blackjack` and `Texas Hold'em` before entering a table
+- the modal header uses a premium tabbed selection layout for table choice
+- the lobby has a dedicated `DEAL` button that launches the selected game
+- betting controls were moved inside each game's felt table area instead of the pre-entry screen
+- blackjack now cleanly ends with `PLAY AGAIN` as the only post-hand action
+- Texas Hold'em now supports custom raise amounts instead of one fixed raise size
+
+### Dungeon crawling
+
+- the game now includes a dedicated `DUNGEON DESCENT` mode launched from the hub
+- dungeon flow currently uses an old-school text-first presentation instead of a visible route map
+- the current chamber is described with centered narration and button-based decisions
+- room choices are presented as passages rather than exposed room contents, preserving surprise
+- entering a combat room shows a short warning beat before combat starts for extra tension
+- the dungeon UI includes a centered player status strip showing name, level, HP, and armor
+- players can step back from an unopened chamber before committing, but abandoned runs are not persistent
+
 ---
 
-## 19. Important Files At A Glance
+## 20. Important Files At A Glance
 
 - `index.html` - UI structure and script load order
 - `gladiator_game.js` - main game controller and screen logic
@@ -538,15 +616,19 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 - `server.js` - multiplayer WebSocket server
 - `scripts/core/player.js` - player stats and progression source of truth
 - `scripts/modules/combat.js` - combat engine
+- `scripts/modules/dungeon.js` - dungeon crawling flow and room state
 - `scripts/modules/encounter.js` - pit/tournament/injury flow
 - `scripts/modules/shop.js` - shop and potion economy
 - `scripts/modules/save_load.js` - save slots and migration logic
+- `scripts/modules/gamble.js` - gamble hall controller
+- `scripts/modules/blackjack.js` - blackjack minigame
+- `scripts/modules/texas_holdem.js` - Texas Hold'em minigame
 - `ASCENSION-MultiplayerPlan.md` - long-term multiplayer architecture vision
 - `TODO.md` - active rough ideas and balancing notes
 
 ---
 
-## 20. Short Mental Model
+## 21. Short Mental Model
 
 If you need to understand the project fast, think of it like this:
 
@@ -554,6 +636,7 @@ If you need to understand the project fast, think of it like this:
 - `combat` decides what happens in battle
 - `encounter` decides what kind of battle happens next
 - `shop` decides what gear/potions are available
+- `gamble` routes players into optional betting minigames
 - `save_load` preserves the run
 - `game` ties all screens and systems together
 - `server.js` is a separate prototype PvP authority layer

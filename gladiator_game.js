@@ -1991,6 +1991,7 @@ const game = {
     closeVictory() {
         $('modal-victory').classList.add('hidden');
         $('vic-xp-bar').style.width='0%';
+        if (typeof this.clearDungeonVictoryLoot === 'function') this.clearDungeonVictoryLoot();
 
         // Level-up check happens first, regardless of tournament state
         if ((this.player.level || 1) < 100 && this.player.xp >= this.player.xpMax) {

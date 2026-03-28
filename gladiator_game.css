@@ -1084,8 +1084,7 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(360px, 0.8fr);
     gap: 18px;
-    flex: 1;
-    min-height: 0;
+    align-items: stretch;
 }
 .dungeon-map-panel,
 .dungeon-room-panel {
@@ -1098,7 +1097,7 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     padding: 20px 22px 24px;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    gap: 18px;
 }
 .dungeon-map-head {
     display: flex;
@@ -1116,6 +1115,164 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     font-size: 0.9rem;
     text-align: center;
     margin-bottom: 22px;
+}
+.dungeon-section-range {
+    color: #d6ba77;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12rem;
+}
+.dungeon-section-card {
+    padding: 20px;
+    border-radius: 18px;
+    background: radial-gradient(circle at top right, rgba(179,64,30,0.18), transparent 30%), linear-gradient(180deg, rgba(27,27,31,0.96) 0%, rgba(16,16,20,0.98) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.dungeon-section-kicker {
+    color: #8b8b95;
+    text-transform: uppercase;
+    letter-spacing: 0.14rem;
+    font-size: 0.72rem;
+}
+.dungeon-section-title {
+    margin-top: 8px;
+    color: #f4ecdc;
+    font-size: 1.55rem;
+}
+.dungeon-section-copy {
+    margin: 10px 0 0;
+    color: #b8b8c0;
+    line-height: 1.65;
+}
+.dungeon-section-progress {
+    margin-top: 16px;
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+}
+.dungeon-section-progress-fill {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #8d3c26 0%, #d9b164 100%);
+    box-shadow: 0 0 20px rgba(217,177,100,0.25);
+}
+.dungeon-section-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+}
+.dungeon-section-stat {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.dungeon-section-stat span {
+    display: block;
+    color: #8c8c95;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08rem;
+}
+.dungeon-section-stat strong {
+    display: block;
+    margin-top: 7px;
+    color: #f3e8c8;
+    font-size: 0.98rem;
+    line-height: 1.4;
+}
+.dungeon-feed-wrap {
+    padding: 18px 20px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(14,14,18,0.92) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.dungeon-feed-headline {
+    color: #d9d3c0;
+    font-size: 0.92rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14rem;
+}
+.dungeon-loot-feed {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+.dungeon-feed-card,
+.dungeon-feed-empty {
+    padding: 14px 15px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.dungeon-feed-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    color: #f0e2bc;
+    font-size: 0.9rem;
+}
+.dungeon-feed-head span,
+.dungeon-feed-copy,
+.dungeon-feed-empty {
+    color: #a8a8b1;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+.dungeon-bag-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+}
+.dungeon-bag-caption {
+    margin: 10px 0 0;
+    color: #acacb5;
+    line-height: 1.65;
+}
+.dungeon-bag-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+}
+.dungeon-bag-slot {
+    position: relative;
+    min-height: 118px;
+    padding: 14px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(17,17,21,0.96) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.dungeon-bag-slot.is-empty {
+    border-style: dashed;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(14,14,18,0.76) 100%);
+}
+.dungeon-bag-slot-index {
+    color: #8b8b94;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08rem;
+}
+.dungeon-bag-slot-name {
+    margin-top: 10px;
+    color: #f3ebdc;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+.dungeon-bag-slot-copy {
+    margin-top: 8px;
+    color: #a6a6af;
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+.dungeon-bag-slot-clear {
+    position: absolute;
+    top: 10px;
+    right: 10px;
 }
 .dungeon-story-shell {
     display: flex;
@@ -2551,6 +2708,74 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     line-height: 1.45;
 }
 .victory-tournament-banner.hidden { display: none; }
+.victory-dungeon-loot {
+    margin-top: 18px;
+    padding: 16px 18px 18px;
+    border-radius: 16px;
+    background: radial-gradient(circle at top right, rgba(168,74,40,0.18), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(16,16,19,0.92) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.victory-dungeon-loot.hidden {
+    display: none;
+}
+.victory-dungeon-loot-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+.victory-dungeon-loot-meta {
+    margin-top: 4px;
+    color: #bbb1a3;
+    font-size: 0.92rem;
+}
+.victory-dungeon-loot-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+.dungeon-loot-card {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(18,18,21,0.94) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.dungeon-loot-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+}
+.dungeon-loot-kind {
+    color: #8e8e97;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12rem;
+}
+.dungeon-loot-name {
+    margin-top: 6px;
+    color: #f4ecdd;
+    font-size: 1rem;
+}
+.dungeon-loot-value {
+    color: #e5be69;
+    font-size: 0.92rem;
+    text-align: right;
+}
+.dungeon-loot-note {
+    margin-top: 10px;
+    color: #a7a7b0;
+    font-size: 0.88rem;
+}
+.dungeon-loot-note.is-active,
+.dungeon-loot-action-state {
+    color: #e3c77a;
+}
+.dungeon-loot-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
 .victory-continue-btn {
     width: 100%;
     margin: 20px 0 0;
@@ -3186,8 +3411,12 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     .dungeon-topbar { flex-direction: column; }
     .dungeon-stat-strip { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .dungeon-room-panel-story { padding: 28px 20px 24px; min-height: 0; width: 100%; }
+    .dungeon-layout { grid-template-columns: 1fr; }
     .dungeon-room-actions .btn { min-width: 0; width: 100%; }
     .dungeon-player-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+    .dungeon-section-stats,
+    .dungeon-bag-grid,
+    .victory-reward-grid { grid-template-columns: 1fr; }
     .list-panel--inv { flex-direction: column; }
     .inv-bag-card {
         width: 100%;

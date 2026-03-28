@@ -1700,6 +1700,7 @@ const combat = {
         let tournamentBannerText = '';
         let isFinalRound = false;
         let isFinalDungeonRoom = false;
+        let dungeonLootBundle = null;
         if (inTournament) {
             isFinalRound = game.currentTournament.index >= game.currentTournament.rounds.length - 1;
             if (!isFinalRound) {
@@ -1718,6 +1719,10 @@ const combat = {
             gold += 20 + ((game.currentDungeon.depth || 1) * 14) + (roomFloor * 18);
             xp += 30 + ((game.currentDungeon.depth || 1) * 16) + (roomFloor * 22);
             isFinalDungeonRoom = !!currentNode && currentNode.type === 'boss';
+            if (typeof game.createDungeonLootBundle === 'function') {
+                dungeonLootBundle = game.createDungeonLootBundle(currentNode, this.context);
+                if (dungeonLootBundle) gold += dungeonLootBundle.goldTotal || 0;
+            }
             if (isFinalDungeonRoom) {
                 gold += 140 + ((game.currentDungeon.depth || 1) * 60);
                 xp += 170 + ((game.currentDungeon.depth || 1) * 75);
@@ -1732,9 +1737,6 @@ const combat = {
         }
         // Victory ekranını X animasyonundan ~2.5sn sonra göster
         setTimeout(() => {
-            if (inDungeon && typeof game.resolveCurrentDungeonCombatVictory === 'function') {
-                game.resolveCurrentDungeonCombatVictory();
-            }
             game.resolveFightInjuries({
                 mode: this.mode,
                 context: this.context,
@@ -1743,6 +1745,14 @@ const combat = {
                 lastEnemyName: this.lastEnemyName,
                 defeat: false
             });
+            if (inDungeon && dungeonLootBundle && typeof game.grantDungeonLootBundle === 'function') {
+                game.grantDungeonLootBundle(dungeonLootBundle);
+            } else if (!inDungeon && typeof game.clearDungeonVictoryLoot === 'function') {
+                game.clearDungeonVictoryLoot();
+            }
+            if (inDungeon && typeof game.resolveCurrentDungeonCombatVictory === 'function') {
+                game.resolveCurrentDungeonCombatVictory();
+            }
             p.gold += gold; p.xp += xp;
             this.returnUnusedPotions();
             $('modal-victory').classList.remove('hidden');
@@ -1804,6 +1814,7 @@ const combat = {
                 tournamentBanner.innerText = tournamentBannerText;
                 tournamentBanner.classList.toggle('hidden', !tournamentBannerText);
             }
+            if (inDungeon && typeof game.renderDungeonVictoryLoot === 'function') game.renderDungeonVictoryLoot();
             this.animateVal('vic-gold',0,gold,1000); this.animateVal('vic-xp',0,xp,1000);
             $('vic-xp-gain').innerText = xp;
             $('vic-xp-text').innerText = `${p.xp}/${p.xpMax}`;
