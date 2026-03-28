@@ -15,8 +15,11 @@ class Player {
         this.skillPoints = 0;
         this.skills = {};
         this.tournamentsCompleted = 0;
+        this.dungeonsCompleted = 0;
+        this.deepestDungeonDepth = 0;
         this.injuries = [];
-        this.potionSlots = [null, null, null];
+        this.bagCapacity = 8;
+        this.bagSlots = new Array(8).fill(null);
     }
 
     // --- Skill helpers ---

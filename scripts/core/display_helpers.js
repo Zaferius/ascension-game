@@ -52,5 +52,6 @@ const getItemIconPathShared = (item) => {
     if (item.type === 'armor') return getArmorIconPathShared(item);
     if (item.type === 'trinket') return item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
     if (item.type === 'potion') return 'assets/images/potion-icons/potion-icon.png';
+    if (item.type === 'consumable') return null; // emoji icon — handled by caller
     return '';
 };

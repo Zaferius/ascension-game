@@ -7,27 +7,44 @@ const blackjack = {
         const total = $('bj-bet-total');
         if (total) total.innerText = this.bet;
     },
-    open() {
+    syncGoldUI() {
+        const gold = $('bj-gold');
+        if (gold && game.player) gold.innerText = game.player.gold;
+    },
+    resetState() {
         this.deck = [];
         this.playerHand = [];
         this.dealerHand = [];
         this.bet = 0;
         this.active = false;
-        $('modal-gamble').classList.remove('hidden');
-        $('bj-setup').classList.remove('hidden');
-        $('bj-game').classList.add('hidden');
+    },
+    showIdleTable() {
+        $('bj-game').classList.remove('hidden');
+        $('bj-betbar').classList.remove('hidden');
         $('bj-controls').classList.add('hidden');
         $('bj-reset').classList.add('hidden');
-        $('bj-msg').innerText = "";
+    },
+    open() {
+        this.resetState();
+        $('bj-msg').innerText = 'Set your wager, then deal the hand.';
         $('player-hand').innerHTML = '';
         $('dealer-hand').innerHTML = '';
         $('player-score').innerText = '';
         $('dealer-score').innerText = '';
-        $('bj-gold').innerText = game.player.gold;
+        this.showIdleTable();
+        this.syncGoldUI();
         this.updateBetUI();
-        const res = $('bj-result-overlay'); if(res) res.classList.add('hidden');
+        const res = $('bj-result-overlay');
+        if (res) {
+            res.classList.add('hidden');
+            res.classList.remove('visible');
+        }
     },
-    close() { $('modal-gamble').classList.add('hidden'); game.updateHubUI(); },
+    close() {
+        if (window.gamble) return gamble.close();
+        $('modal-gamble').classList.add('hidden');
+        game.updateHubUI();
+    },
     addBet(amount) {
         if (!game.player) return;
         this.bet = Math.min(game.player.gold, Math.max(0, this.bet + amount));
@@ -62,13 +79,15 @@ const blackjack = {
     deal() {
         const b = this.bet;
         if(isNaN(b) || b<=0 || b>game.player.gold) { alert("Invalid bet"); return; }
-        this.bet = b; game.player.gold -= b; $('bj-gold').innerText = game.player.gold;
+        this.bet = b;
+        game.player.gold -= b;
+        this.syncGoldUI();
         this.createDeck();
         this.playerHand=[this.deck.pop(), this.deck.pop()];
         this.dealerHand=[this.deck.pop(), this.deck.pop()];
         this.active = true;
-        $('bj-setup').classList.add('hidden');
         $('bj-game').classList.remove('hidden');
+        $('bj-betbar').classList.add('hidden');
         $('bj-controls').classList.remove('hidden');
         $('bj-reset').classList.add('hidden');
         $('bj-msg').innerText="";
@@ -76,11 +95,13 @@ const blackjack = {
         if(this.calc(this.playerHand)===21) this.end();
     },
     hit() {
+        if (!this.active) return;
         this.playerHand.push(this.deck.pop());
         this.render(false);
         if(this.calc(this.playerHand)>21) this.end();
     },
     stand() {
+        if (!this.active) return;
         this.active = false;
         while (this.calc(this.dealerHand) < 17) this.dealerHand.push(this.deck.pop());
         this.end();
@@ -88,6 +109,7 @@ const blackjack = {
     end() {
         this.active = false;
         this.render(true);
+        $('bj-betbar').classList.add('hidden');
         $('bj-controls').classList.add('hidden');
         $('bj-reset').classList.remove('hidden');
 
@@ -116,11 +138,12 @@ const blackjack = {
             ov.classList.remove('visible');
             setTimeout(() => { ov.classList.add('visible'); }, 700);
         }
+        this.syncGoldUI();
         game.saveGame();
     },
     render(show) {
         const draw = (hand, hideFirst, animateLast) => hand.map((c,i) => {
-            if(hideFirst && i===0) return `<div class="bj-card" style="background:#222; color:#222;">?</div>`;
+            if(hideFirst && i===0) return `<div class="bj-card card-back">?</div>`;
             const anim = (animateLast && i === hand.length-1) ? 'bj-anim' : '';
             return `<div class="bj-card ${['♥','♦'].includes(c.suit)?'red':''} ${anim}">${c.val}${c.suit}</div>`;
         }).join('');

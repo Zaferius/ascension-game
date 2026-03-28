@@ -1,10 +1,11 @@
  -Büyücü itemleri büyü yapma olayı
--Bleed efekti durdurmak icin bandaj itemi. (Bleed cured gibi mesaj)
 -Combat sırasında görünen logları biraz daha hikayelestirmeliyiz. Örneğin "You strike the enemy with your sword" yerine "With a mighty swing, you cleave the enemy's armor" gibi daha dramatik ve hikayeli ifadeler kullanabiliriz. Injury / Hastalık yediğimiz anları da böyle loglayalım. örneğin "You feel a sharp pain in your side as a wound festers" yerine "A festering wound on your side throbs with excruciating pain" [SAKATLIK İSMİ] gibi daha dramatik ve hikayeli ifadeler kullanabiliriz. Planlayalım.
 -1. turnuva sırasında tam 3 level atladıgım icin 1. turnuva biter bitmez diğerine girmeye hak kazandım. Bunu biraz dengelemek lazım. 
 -Pot fiyatları?? Test et para hilesi yapmadan.
 -Attack puanım 1 olmasına ragmen oldukca fazla vurus ihtimaline sahibim. bunu biraz nerfleyelim.
-
+-Dungeonlarda dinamik efektler(oda gecislerinde blur shake falan filan. canlı hissettirsin.)
+-dungeonda ölen düsmanların loot bırakması ve envanter(Bag) yönetimi.
+-Achivements.
 
 
 -perhance enemy avatar seed: //// (seed:::876714083)

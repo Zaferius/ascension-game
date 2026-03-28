@@ -90,13 +90,20 @@ const gameSaveLoad = {
         Object.assign(this.player, plain);
         if (!this.player.skills) this.player.skills = {};
         if (typeof this.player.skillPoints !== 'number') this.player.skillPoints = 0;
+        if (typeof this.player.dungeonsCompleted !== 'number') this.player.dungeonsCompleted = 0;
+        if (typeof this.player.deepestDungeonDepth !== 'number') this.player.deepestDungeonDepth = 0;
 
-        // Normalize potionSlots for older saves
-        if (!Array.isArray(this.player.potionSlots)) {
-            this.player.potionSlots = [null, null, null];
-        } else if (this.player.potionSlots.length !== 3) {
-            const slots = this.player.potionSlots;
-            this.player.potionSlots = [slots[0] || null, slots[1] || null, slots[2] || null];
+        // Migrate bag system — handle legacy saves (< v8) that had 3-slot potionSlots
+        if (!this.player.bagCapacity || typeof this.player.bagCapacity !== 'number') {
+            this.player.bagCapacity = 8;
+        }
+        if (!Array.isArray(this.player.bagSlots)) {
+            this.player.bagSlots = new Array(this.player.bagCapacity).fill(null);
+        } else {
+            while (this.player.bagSlots.length < this.player.bagCapacity) {
+                this.player.bagSlots.push(null);
+            }
+            this.player.bagSlots = this.player.bagSlots.slice(0, this.player.bagCapacity);
         }
 
         // Fix legendary item names in older saves
@@ -134,6 +141,7 @@ const gameSaveLoad = {
         this.lastShopFightReset = typeof plain._lastShopFightReset === 'number' ? plain._lastShopFightReset : 0;
         this.potionStock = plain._potionStock || {};
         this.lastPotionFightReset = typeof plain._lastPotionFightReset === 'number' ? plain._lastPotionFightReset : 0;
+        this.currentDungeon = null;
 
         const hasAnyShop = (this.shopStock.weapon && this.shopStock.weapon.length) ||
             (this.shopStock.armor && this.shopStock.armor.length) ||
@@ -150,6 +158,13 @@ const gameSaveLoad = {
         const meta = this.loadSaveMeta();
         this.saveSlots = meta.slots;
         this.lastSlot = meta.lastSlot;
+        const filledSlots = meta.slots
+            .map((slot, index) => ({ slot, index }))
+            .filter(entry => !!entry.slot);
+        if (filledSlots.length === 1) {
+            this.loadSlot(filledSlots[0].index, meta);
+            return;
+        }
         const cont = $('load-slots');
         if (!cont) return;
         cont.innerHTML = '';

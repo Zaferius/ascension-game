@@ -1,8 +1,9 @@
 const game = {
     ...gameSaveLoad,
     ...gameShop,
+    ...gameDungeon,
     ...gameEncounter,
-    player: null, selectedAvatar: 0, shopStock: { weapon: [], armor: [], trinket: [] }, shopSortOrder: 'desc', shopSortKey: 'price', currentShopType: 'weapon', currentTradeMode: 'buy', codexFilter: 'weapon', currentPitMode: 'duel', currentEncounter: null, currentTournament: null,
+    player: null, selectedAvatar: 0, shopStock: { weapon: [], armor: [], trinket: [] }, shopSortOrder: 'desc', shopSortKey: 'price', currentShopType: 'weapon', currentTradeMode: 'buy', codexFilter: 'weapon', currentPitMode: 'duel', currentEncounter: null, currentTournament: null, currentDungeon: null,
     potionStock: {},
     saveSlots: [], lastSlot: -1, currentSlotIndex: -1,
     shopFightCount: 0,
@@ -366,6 +367,18 @@ const game = {
                 lines.push(`<div><span class="text-shield">Armor:</span> ${armorLine}</div>`);
             } else if (item.type === 'trinket') {
                 lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
+            } else if (item.type === 'potion') {
+                const typeLabel = item.subType === 'armor' ? 'Armor' : 'Health';
+                const pct = item.percent || 0;
+                lines.push(`<div><span class="text-green">Type:</span> Potion</div>`);
+                lines.push(`<div><span class="text-blue">Effect:</span> Restore ${pct}% ${typeLabel}</div>`);
+            } else if (item.type === 'consumable') {
+                lines.push(`<div><span class="text-green">Type:</span> Consumable</div>`);
+                if (item.desc) lines.push(`<div><span class="text-blue">Effect:</span> ${item.desc}</div>`);
+            } else if (item.type === 'bag_upgrade') {
+                lines.push(`<div><span class="text-green">Type:</span> Permanent Upgrade</div>`);
+                if (item.toSlots) lines.push(`<div><span class="text-gold">Capacity:</span> ${item.toSlots} bag slots</div>`);
+                if (item.desc) lines.push(`<div><span class="text-blue">Effect:</span> ${item.desc}</div>`);
             }
             if (item.statMods) {
                 const map = [
@@ -402,6 +415,7 @@ const game = {
                 if (item.type === 'weapon') iconPath = getWeaponPreviewIconPath(item);
                 else if (item.type === 'armor') iconPath = getArmorIconPath(item);
                 else if (item.type === 'trinket') iconPath = item.iconPath || 'assets/images/trinket-icons/trinket2-icon.png';
+                else if (item.type === 'potion') iconPath = 'assets/images/potion-icons/potion-icon.png';
                 if (iconPath) {
                     previewIcon.src = iconPath;
                     previewIcon.classList.remove('hidden');
@@ -611,6 +625,8 @@ const game = {
         setupTrinketHover('hub-trinket2-name', p.gear.trinket2);
         const tournamentBtn = $('btn-tournament');
         const tournamentSub = $('hub-tournament-sub');
+        const dungeonBtn = $('btn-dungeon');
+        const dungeonSub = $('hub-dungeon-sub');
         const tournamentBanner = $('hub-tournament-banner');
         const tournamentBannerText = $('hub-tournament-banner-text');
         if (tournamentBtn && tournamentSub) {
@@ -630,6 +646,19 @@ const game = {
                     tournamentSub.innerText = `Unlocks at level ${nextLevel}. Normal pit fights give gold only once it opens.`;
                 }
                 if (tournamentBanner) tournamentBanner.classList.add('hidden');
+            }
+        }
+        if (dungeonBtn && dungeonSub) {
+            if (this.currentDungeon && Array.isArray(this.currentDungeon.floors) && this.currentDungeon.floors.length) {
+                const currentNode = typeof this.getCurrentDungeonNode === 'function' ? this.getCurrentDungeonNode() : null;
+                const currentFloor = currentNode ? currentNode.floor + 1 : 1;
+                dungeonBtn.classList.add('is-available');
+                dungeonSub.innerText = this.currentDungeon.completed
+                    ? `Depth ${this.currentDungeon.depth} cleared. Enter to collect yourself and leave.`
+                    : `Depth ${this.currentDungeon.depth} active. Resume from floor ${currentFloor}.`;
+            } else {
+                dungeonBtn.classList.remove('is-available');
+                dungeonSub.innerText = `Explore a branching dungeon at Depth ${this.getDungeonDepth()}. Room contents stay hidden until entered.`;
             }
         }
         const hubMsg = $('hub-msg');
@@ -744,7 +773,10 @@ const game = {
             lines.push(`<div style="font-size:1rem; margin-bottom:4px;" class="${item.rarity}">${item.name}</div>`);
             const badgeMarkup = this.getItemBadgeMarkup(item);
             if (badgeMarkup) lines.push(`<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">${badgeMarkup}</div>`);
-            if (item.type === 'weapon') {
+            if (item.type === 'consumable') {
+                lines.push(`<div><span class="text-blue">Type:</span> Consumable</div>`);
+                if (item.desc) lines.push(`<div style="color:#ccc; margin-top:4px;">${item.desc}</div>`);
+            } else if (item.type === 'weapon') {
                 lines.push(`<div><span class="text-blue">Type:</span> ${getDisplayItemType(item)}</div>`);
                 if (typeof item.min === 'number' && typeof item.max === 'number') {
                     lines.push(`<div><span class="text-orange">Damage:</span> ${item.min}-${item.max}</div>`);
@@ -868,6 +900,8 @@ const game = {
         const titleEl = $('list-title');
         const headerExtra = $('list-header-extra');
         if (!cont || !titleEl) return;
+        const listPanel = document.querySelector('.list-panel');
+        if (listPanel) listPanel.classList.remove('list-panel--inv');
         titleEl.innerText = this.currentTradeMode === 'sell' ? 'POTION SHOP - SELL' : 'POTION SHOP';
         const subtitleEl = $('list-title-sub');
         if (subtitleEl) subtitleEl.innerText = this.currentTradeMode === 'sell' ? 'Trade away spare potions from your inventory.' : 'Brew room stock rotates quickly. Buy before the shelf goes dry.';
@@ -889,7 +923,7 @@ const game = {
         }
 
         // Potion shop açıkken inventory'ye özel potion slot kartını gizle
-        const slotCard = $('inv-potion-slots-card');
+        const slotCard = $('inv-bag-card');
         if (slotCard) {
             slotCard.classList.add('hidden');
             slotCard.innerHTML = '';
@@ -1026,6 +1060,9 @@ const game = {
     },
     renderList(items, mode) {
         this.currentListMode = mode;
+        // Two-column layout only for inventory mode
+        const listPanel = document.querySelector('.list-panel');
+        if (listPanel) listPanel.classList.toggle('list-panel--inv', mode === 'inv');
         const cont = $('list-container'); cont.innerHTML = '';
         const header = $('list-header-extra');
         if (header) header.innerHTML = '';
@@ -1174,6 +1211,13 @@ const game = {
                 const pct = item.percent || 0;
                 lines.push(`<div><span class="text-green">Type:</span> Potion</div>`);
                 lines.push(`<div><span class="text-blue">Effect:</span> Restore ${pct}% ${typeLabel}</div>`);
+            } else if (item.type === 'consumable') {
+                lines.push(`<div><span class="text-green">Type:</span> Consumable</div>`);
+                if (item.desc) lines.push(`<div><span class="text-blue">Effect:</span> ${item.desc}</div>`);
+            } else if (item.type === 'bag_upgrade') {
+                lines.push(`<div><span class="text-green">Type:</span> Permanent Upgrade</div>`);
+                if (item.toSlots) lines.push(`<div><span class="text-gold">Capacity:</span> ${item.toSlots} bag slots</div>`);
+                if (item.desc) lines.push(`<div><span class="text-blue">Effect:</span> ${item.desc}</div>`);
             }
             // Stat buffs / debuffs from statMods
             if (item.statMods) {
@@ -1387,10 +1431,13 @@ const game = {
             const lvlHtml = `<span style="color:${lvlColor};">${minLvl}</span>`;
             const badgeMarkup = this.getItemBadgeMarkup(item);
             const iconPath = getItemIconPathShared(item);
+            const iconHtml = item.type === 'consumable'
+                ? `<span style="font-size:1.5rem; line-height:1;">${item.icon || '📦'}</span>`
+                : (iconPath ? `<img src="${iconPath}" alt="">` : '');
 
             div.innerHTML = `
                 <div class="item-main-wrap">
-                    <div class="item-card-icon">${iconPath ? `<img src="${iconPath}" alt="">` : ''}</div>
+                    <div class="item-card-icon">${iconHtml}</div>
                     <div class="item-main">
                         <div class="item-main-name ${item.rarity}">${nameHtml}</div>
                         ${badgeMarkup ? `<div class="item-main-badges">${badgeMarkup}</div>` : ''}
@@ -1451,28 +1498,39 @@ const game = {
                     }
                 } else {
                     // Inventory actions
-                    if (item.type === 'potion') {
+                    if (item.type === 'potion' || item.type === 'consumable') {
                         if (!this.player) return;
-                        if (!Array.isArray(this.player.potionSlots)) {
-                            this.player.potionSlots = [null, null, null];
+                        if (!Array.isArray(this.player.bagSlots)) {
+                            this.player.bagSlots = [null, null, null];
                         }
-                        const slots = this.player.potionSlots;
+                        const slots = this.player.bagSlots;
                         const freeIndex = slots.findIndex(s => !s);
                         if (freeIndex === -1) {
-                            alert('All potion slots are filled.');
+                            alert('All bag slots are filled.');
                             return;
                         }
 
-                        if (!this.consumePotionFromInventory(item, 1)) {
-                            alert('Potion not found in inventory.');
-                            this.renderList(this.player.inventory, mode);
-                            return;
+                        if (item.type === 'consumable') {
+                            // Remove one from inventory
+                            const invItem = this.player.inventory.find(it => it && it.type === 'consumable' && it.subType === item.subType && (it.qty || 0) >= 1);
+                            if (!invItem) { this.renderList(this.player.inventory, mode); return; }
+                            invItem.qty -= 1;
+                            if (invItem.qty <= 0) this.player.inventory.splice(this.player.inventory.indexOf(invItem), 1);
+                        } else {
+                            if (!this.consumePotionFromInventory(item, 1)) {
+                                alert('Potion not found in inventory.');
+                                this.renderList(this.player.inventory, mode);
+                                return;
+                            }
                         }
 
                         slots[freeIndex] = {
+                            type: item.type,
                             subType: item.subType,
-                            percent: item.percent,
+                            percent: item.percent || 0,
                             name: item.name,
+                            icon: item.icon || '',
+                            desc: item.desc || '',
                             rarity: item.rarity || 'rarity-common',
                             price: item.price,
                             used: false
@@ -1489,8 +1547,8 @@ const game = {
             cont.appendChild(div);
         });
 
-        // Inventory-specific: fill external Potion Slots card (bottom-left of screen-list)
-        const slotCard = $('inv-potion-slots-card');
+        // Inventory-specific: BAG section (shown below item list when in inventory mode)
+        const slotCard = $('inv-bag-card');
         if (slotCard) {
             if (mode !== 'inv') {
                 slotCard.classList.add('hidden');
@@ -1499,72 +1557,91 @@ const game = {
                 slotCard.classList.remove('hidden');
                 slotCard.innerHTML = '';
 
-                const title = document.createElement('div');
-                title.textContent = 'Potion Slots';
-                title.className = 'potion-card-title';
-                slotCard.appendChild(title);
+                const filledCount = (this.player.bagSlots || []).filter(s => s).length;
+                const capacity = this.player.bagCapacity || 8;
 
-                const slotsArr = (this.player && Array.isArray(this.player.potionSlots)) ? this.player.potionSlots : [null, null, null];
-                const makeSlotRow = (idx) => {
-                    const row = document.createElement('div');
-                    row.className = 'potion-card-row';
+                const header = document.createElement('div');
+                header.className = 'inv-bag-header';
+                header.innerHTML = `
+                    <span>🎒 BAG</span>
+                    <span class="inv-bag-count">${filledCount} / ${capacity}</span>
+                `;
+                slotCard.appendChild(header);
 
-                    const info = document.createElement('div');
+                const hint = document.createElement('span');
+                hint.className = 'inv-bag-hint';
+                hint.textContent = 'Click a potion or consumable to assign to a slot.';
+                slotCard.appendChild(hint);
+
+                const grid = document.createElement('div');
+                grid.className = 'inv-bag-grid';
+                slotCard.appendChild(grid);
+
+                const slotsArr = (this.player && Array.isArray(this.player.bagSlots)) ? this.player.bagSlots : new Array(capacity).fill(null);
+
+                const makeSlotCard = (idx) => {
                     const slot = slotsArr[idx] || null;
-                    let label = `Slot ${idx+1}`;
                     let detail = '';
+                    let iconHtml = '';
                     if (!slot) {
                         detail = 'Empty';
+                        iconHtml = `<div class="inv-bag-slot-empty-icon">—</div>`;
+                    } else if (slot.type === 'consumable') {
+                        detail = slot.name;
+                        iconHtml = `<div class="inv-bag-slot-icon">${slot.icon || '📦'}</div>`;
                     } else {
                         const typeLabel = slot.subType === 'armor' ? 'Armor' : 'HP';
                         detail = `${typeLabel} ${slot.percent || 0}%`;
+                        iconHtml = `<div class="inv-bag-slot-icon">🧪</div>`;
                     }
-                    info.innerHTML = `<div class="potion-card-slot-label">${label}</div><div class="potion-card-slot-detail">${detail}</div>`;
-                    row.appendChild(info);
 
-                    const btn = document.createElement('button');
-                    btn.className = 'btn btn-xs';
-                    btn.textContent = 'Clear';
+                    const card = document.createElement('div');
+                    card.className = `inv-bag-slot-card${slot ? '' : ' inv-bag-slot-empty'}`;
+
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'btn btn-xs inv-bag-slot-clear';
+                    clearBtn.textContent = '✕';
+                    clearBtn.title = 'Remove from bag';
                     if (!slot) {
-                        btn.disabled = true;
+                        clearBtn.style.visibility = 'hidden';
                     } else {
-                        btn.onclick = () => {
-                            if (!this.player || !Array.isArray(this.player.potionSlots)) return;
-                            game.addPotionToInventory(slot, 1);
-                            this.player.potionSlots[idx] = null;
+                        clearBtn.onclick = () => {
+                            if (!this.player || !Array.isArray(this.player.bagSlots)) return;
+                            if (slot.type === 'consumable') {
+                                game.addConsumableToInventory(slot, 1);
+                            } else {
+                                game.addPotionToInventory(slot, 1);
+                            }
+                            this.player.bagSlots[idx] = null;
                             this.renderList(this.player.inventory, 'inv');
                         };
                     }
-                    row.appendChild(btn);
 
-                    // Tooltip for potion slots using the global preview box
+                    card.innerHTML = `
+                        ${iconHtml}
+                        <div class="inv-bag-slot-label">Slot ${idx + 1}</div>
+                        <div class="inv-bag-slot-detail">${detail}</div>
+                    `;
+                    card.appendChild(clearBtn);
+
                     if (slot && previewBox && previewBody) {
-                        row.onmouseenter = (ev) => {
-                            const fakeItem = {
-                                type: 'potion',
-                                rarity: 'rarity-common',
-                                name: slot.name || detail,
-                                subType: slot.subType,
-                                percent: slot.percent || 0
-                            };
+                        card.onmouseenter = (ev) => {
+                            const fakeItem = slot.type === 'consumable'
+                                ? { type: 'consumable', rarity: slot.rarity || 'rarity-common', name: `${slot.icon || ''} ${slot.name}`.trim(), subType: slot.subType, desc: slot.desc, statMods: null }
+                                : { type: 'potion', rarity: 'rarity-common', name: slot.name || detail, subType: slot.subType, percent: slot.percent || 0 };
                             buildPreviewFromItem(fakeItem);
                             movePreview(ev);
                             previewBox.classList.remove('hidden');
                             previewBox.classList.add('visible');
                         };
-                        row.onmousemove = (ev) => {
-                            if (previewBox.classList.contains('visible')) movePreview(ev);
-                        };
-                        row.onmouseleave = () => {
-                            previewBox.classList.remove('visible');
-                        };
+                        card.onmousemove = (ev) => { if (previewBox.classList.contains('visible')) movePreview(ev); };
+                        card.onmouseleave = () => { previewBox.classList.remove('visible'); };
                     }
-                    return row;
+
+                    return card;
                 };
 
-                slotCard.appendChild(makeSlotRow(0));
-                slotCard.appendChild(makeSlotRow(1));
-                slotCard.appendChild(makeSlotRow(2));
+                for (let i = 0; i < capacity; i++) grid.appendChild(makeSlotCard(i));
             }
         }
     },
@@ -1921,8 +1998,8 @@ const game = {
             this.player.xpMax = Math.floor(this.player.xpMax * 1.5);
             this.player.level = Math.min(100, (this.player.level || 1) + 1);
             this.player.skillPoints = (this.player.skillPoints || 0) + 1;
-            // If in a tournament, resume it after the upgrade screen instead of going to hub
-            this._levelUpReturnToTournament = !!(this.currentTournament);
+            // If in a tournament or dungeon run, resume that chain after the upgrade screen
+            this._levelUpReturnToTournament = !!(this.currentTournament || this.currentDungeon);
             this.triggerLevelUp();
             return;
         }
@@ -1934,6 +2011,9 @@ const game = {
         if (this.currentTournament && this.currentTournament.index < this.currentTournament.rounds.length - 1) {
             this.currentTournament.index += 1;
             this.prepareEncounter(this.currentTournament.rounds[this.currentTournament.index]);
+        } else if (this.currentDungeon) {
+            this.currentEncounter = null;
+            this.showDungeonScreen();
         } else {
             this.showHub();
         }
@@ -1994,6 +2074,7 @@ game.handlePlayerDeath = function() {
     }
     this.currentEncounter = null;
     this.currentTournament = null;
+    this.currentDungeon = null;
 
     // Death ekranını X efektinden ~2.5sn sonra göster
     setTimeout(() => {
@@ -2012,6 +2093,7 @@ game.handleDeathContinue = function() {
     this._deathInProgress = false;
     this.currentEncounter = null;
     this.currentTournament = null;
+    this.currentDungeon = null;
     this.showHub();
 };
 
@@ -2021,3 +2103,5 @@ game.initSaves();
 window.game = game;
 window.combat = combat;
 window.blackjack = blackjack;
+window.texasHoldem = texasHoldem;
+window.gamble = gamble;

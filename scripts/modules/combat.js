@@ -14,7 +14,7 @@ const combat = {
     playerDots: [], // active DOT effects on player
     dotResist: {},  // per-combat resistance per DOT id (0-1)
     log: [],        // recent combat log lines
-    potionSlots: [null, null, null], // active potions brought into this fight
+    bagSlots: [null, null, null], // active potions brought into this fight
     _lagTimers: {},
     _lastBarPct: {},
     mode: 'duel',
@@ -220,14 +220,17 @@ const combat = {
 
         // Prepare combat potion slots for this fight.
         // Inventory reservation is handled when assigning slots in inventory.
-        this.potionSlots = [null, null, null];
-        if (p && Array.isArray(p.potionSlots)) {
-            this.potionSlots = p.potionSlots.map(slot => {
+        this.bagSlots = [null, null, null];
+        if (p && Array.isArray(p.bagSlots)) {
+            this.bagSlots = p.bagSlots.map(slot => {
                 if (!slot) return null;
                 return {
+                    type: slot.type || 'potion',
                     subType: slot.subType,
                     percent: slot.percent || 0,
                     name: slot.name || '',
+                    icon: slot.icon || '',
+                    desc: slot.desc || '',
                     rarity: slot.rarity || 'rarity-common',
                     price: slot.price,
                     used: false
@@ -632,47 +635,71 @@ const combat = {
         }
     },
     openBag() {
-        // Sadece oyuncu turundayken ve aksiyon kilit değilken Bag açılabilsin
         if (this.turn !== 'player' || this.actionLock) return;
         const modal = $('modal-bag');
         const list = $('bag-list');
+        const countEl = $('bag-count');
         if (!modal || !list) return;
 
         list.innerHTML = '';
 
-        const slots = this.potionSlots || [];
-        const hasAny = slots.some(s => s && !s.used);
-        if (!hasAny) {
-            list.innerHTML = '<p style="color:#aaa; font-size:0.9rem;">No active potions in your slots.</p>';
-        } else {
-            slots.forEach((slot, idx) => {
-                const row = document.createElement('div');
-                row.className = 'stat-row';
-                let label = `Slot ${idx + 1}: `;
-                if (!slot) {
-                    label += 'Empty';
-                } else if (slot.used) {
-                    label += 'Used';
-                } else {
-                    const typeLabel = slot.subType === 'armor' ? 'Armor' : 'HP';
-                    label += `${typeLabel} ${slot.percent || 0}%`;
-                }
-                row.innerHTML = `
-                    <span>${label}</span>
-                    <span>
-                        <button class="btn btn-xs" data-slot="${idx}">Use</button>
-                    </span>
-                `;
-                const btn = row.querySelector('button');
-                if (!slot || slot.used) {
-                    if (btn) btn.disabled = true;
-                } else if (btn) {
-                    btn.onclick = () => this.usePotionSlot(idx);
-                }
-                list.appendChild(row);
-            });
+        const slots = this.bagSlots || [];
+        const filledSlots = slots.filter(s => s);
+        if (countEl) countEl.innerText = `${filledSlots.length} item${filledSlots.length === 1 ? '' : 's'}`;
+
+        if (filledSlots.length === 0) {
+            list.innerHTML = '<p class="bag-modal-empty">Your bag is empty.<br><span style="font-size:0.8rem;">Assign items from Inventory before a fight.</span></p>';
+            modal.classList.remove('hidden');
+            return;
         }
 
+        const grid = document.createElement('div');
+        grid.className = 'bag-modal-grid';
+
+        slots.forEach((slot, idx) => {
+            if (!slot) return; // skip empty slots in combat bag view
+
+            const card = document.createElement('div');
+            const isUsed = slot.used;
+            card.className = `bag-modal-card${isUsed ? ' bag-modal-card-used' : ''}`;
+
+            let iconHtml = '';
+            let nameHtml = '';
+            let descHtml = '';
+
+            if (slot.type === 'consumable') {
+                iconHtml = `<div class="bag-modal-icon">${slot.icon || '📦'}</div>`;
+                nameHtml = slot.name;
+                const dotLabel = { cure_bleed: 'Removes Bleed', cure_poison: 'Removes Poison', cure_burn: 'Removes Burn' }[slot.subType] || '';
+                descHtml = dotLabel;
+            } else {
+                const typeLabel = slot.subType === 'armor' ? 'Armor' : 'HP';
+                iconHtml = `<div class="bag-modal-icon">🧪</div>`;
+                nameHtml = slot.name || `${typeLabel} ${slot.percent || 0}%`;
+                descHtml = `Restores ${slot.percent || 0}% ${typeLabel.toLowerCase()}`;
+            }
+
+            card.innerHTML = `
+                ${iconHtml}
+                <div class="bag-modal-card-body">
+                    <div class="bag-modal-card-name">${isUsed ? `<s>${nameHtml}</s>` : nameHtml}</div>
+                    <div class="bag-modal-card-desc">${isUsed ? 'Used' : descHtml}</div>
+                </div>
+                <button class="btn bag-modal-use-btn" data-idx="${idx}" ${isUsed ? 'disabled' : ''}>
+                    ${isUsed ? '✓' : 'USE'}
+                </button>
+            `;
+
+            if (!isUsed) {
+                card.querySelector('button').onclick = () => {
+                    this.usePotionSlot(idx);
+                };
+            }
+
+            grid.appendChild(card);
+        });
+
+        list.appendChild(grid);
         modal.classList.remove('hidden');
     },
     closeBag() {
@@ -681,8 +708,8 @@ const combat = {
     },
     usePotionSlot(index) {
         if (this.turn !== 'player' || this.actionLock) return;
-        if (!this.potionSlots || index < 0 || index >= this.potionSlots.length) return;
-        const slot = this.potionSlots[index];
+        if (!this.bagSlots || index < 0 || index >= this.bagSlots.length) return;
+        const slot = this.bagSlots[index];
         if (!slot || slot.used) return;
 
         const acts = $('combat-actions');
@@ -691,6 +718,31 @@ const combat = {
             acts.style.pointerEvents = 'none';
         }
         this.actionLock = true;
+
+        // --- Consumable cure items ---
+        const cureMap = { cure_bleed: 'bleed', cure_poison: 'poison', cure_burn: 'burn' };
+        if (slot.type === 'consumable' && cureMap[slot.subType]) {
+            const dotId = cureMap[slot.subType];
+            const before = (this.playerDots || []).length;
+            this.playerDots = (this.playerDots || []).filter(d => d.id !== dotId);
+            const removed = before - this.playerDots.length;
+            const itemName = slot.name || slot.subType;
+            if (removed > 0) {
+                const dotLabel = dotId.charAt(0).toUpperCase() + dotId.slice(1);
+                this.logMessage(`You use <span class="log-${dotId}">${itemName}</span> and cure <span class="log-${dotId}">${dotLabel}</span>.`);
+            } else {
+                this.logMessage(`You use ${itemName}, but you are not affected by ${dotId}.`);
+            }
+            slot.used = true;
+            this.updateUI();
+            this.closeBag();
+            setTimeout(() => {
+                this.setTurn('enemy');
+                this.actionLock = false;
+                if (acts) { acts.style.opacity = '1'; acts.style.pointerEvents = 'auto'; }
+            }, 300);
+            return;
+        }
 
         const type = slot.subType === 'armor' ? 'armor' : 'hp';
         if (type === 'hp') {
@@ -731,17 +783,21 @@ const combat = {
         }, 300);
     },
     returnUnusedPotions() {
-        if (!game.player || !Array.isArray(this.potionSlots)) return;
-        this.potionSlots.forEach((slot) => {
+        if (!game.player || !Array.isArray(this.bagSlots)) return;
+        this.bagSlots.forEach((slot) => {
             if (!slot) return;
             if (!slot.used) {
-                game.addPotionToInventory(slot, 1);
+                if (slot.type === 'consumable') {
+                    game.addConsumableToInventory(slot, 1);
+                } else {
+                    game.addPotionToInventory(slot, 1);
+                }
             }
         });
-        if (game.player && Array.isArray(game.player.potionSlots)) {
-            game.player.potionSlots = game.player.potionSlots.map(slot => slot ? { ...slot, used: false } : null);
+        if (game.player && Array.isArray(game.player.bagSlots)) {
+            game.player.bagSlots = game.player.bagSlots.map(slot => slot ? { ...slot, used: false } : null);
         }
-        this.potionSlots = [null, null, null];
+        this.bagSlots = [null, null, null];
     },
     updateUI() {
         const activeTarget = this.syncActiveEnemy();
@@ -1636,12 +1692,14 @@ const combat = {
         let xp = Math.floor(baseXp * xpMult);
         const tournamentAvailable = game.isTournamentAvailable();
         const inTournament = !!game.currentTournament;
+        const inDungeon = !!game.currentDungeon && this.context && this.context.source === 'dungeon';
         if (!inTournament && this.context && this.context.source === 'pit' && tournamentAvailable && !(this.context && this.context.xpEnabled)) {
             xp = 0;
         }
         let victorySubtitle = 'Enemy Defeated.';
         let tournamentBannerText = '';
         let isFinalRound = false;
+        let isFinalDungeonRoom = false;
         if (inTournament) {
             isFinalRound = game.currentTournament.index >= game.currentTournament.rounds.length - 1;
             if (!isFinalRound) {
@@ -1654,11 +1712,29 @@ const combat = {
                 const tierMeta = game.getTournamentTierMeta(game.currentTournament.tier);
                 tournamentBannerText = `${tierMeta.name} champion. Glory and gold are yours.`;
             }
+        } else if (inDungeon) {
+            const currentNode = typeof game.getCurrentDungeonNode === 'function' ? game.getCurrentDungeonNode() : null;
+            const roomFloor = currentNode ? currentNode.floor : 0;
+            gold += 20 + ((game.currentDungeon.depth || 1) * 14) + (roomFloor * 18);
+            xp += 30 + ((game.currentDungeon.depth || 1) * 16) + (roomFloor * 22);
+            isFinalDungeonRoom = !!currentNode && currentNode.type === 'boss';
+            if (isFinalDungeonRoom) {
+                gold += 140 + ((game.currentDungeon.depth || 1) * 60);
+                xp += 170 + ((game.currentDungeon.depth || 1) * 75);
+                p.dungeonsCompleted = (p.dungeonsCompleted || 0) + 1;
+                p.deepestDungeonDepth = Math.max(p.deepestDungeonDepth || 0, game.currentDungeon.depth || 0);
+                victorySubtitle = `The final chamber breaks. The dungeon yields its tribute.`;
+            } else {
+                victorySubtitle = `The chamber falls quiet. New passages open deeper below.`;
+            }
         } else if (tournamentAvailable && xp === 0) {
             victorySubtitle = 'Gold earned. Tournament progression now withholds pit XP.';
         }
         // Victory ekranını X animasyonundan ~2.5sn sonra göster
         setTimeout(() => {
+            if (inDungeon && typeof game.resolveCurrentDungeonCombatVictory === 'function') {
+                game.resolveCurrentDungeonCombatVictory();
+            }
             game.resolveFightInjuries({
                 mode: this.mode,
                 context: this.context,
@@ -1701,10 +1777,14 @@ const combat = {
                 if (champBanner) champBanner.classList.remove('hidden');
                 if (vicTitle) { vicTitle.innerText = 'CHAMPION!'; vicTitle.classList.add('is-champion'); }
                 if (vicKicker) vicKicker.innerText = 'Tournament Complete';
+            } else if (isFinalDungeonRoom) {
+                if (champBanner) champBanner.classList.remove('hidden');
+                if (vicTitle) { vicTitle.innerText = 'DUNGEON CLEARED'; vicTitle.classList.remove('is-champion'); }
+                if (vicKicker) vicKicker.innerText = 'Depth Conquered';
             } else {
                 if (champBanner) champBanner.classList.add('hidden');
                 if (vicTitle) { vicTitle.innerText = 'VICTORY!'; vicTitle.classList.remove('is-champion'); }
-                if (vicKicker) vicKicker.innerText = inTournament ? 'Tournament' : 'Arena Result';
+                if (vicKicker) vicKicker.innerText = inTournament ? 'Tournament' : (inDungeon ? 'Dungeon Run' : 'Arena Result');
             }
 
             // --- Continue button label ---
@@ -1712,6 +1792,8 @@ const combat = {
             if (continueBtn) {
                 if (inTournament && !isFinalRound) continueBtn.innerText = 'NEXT ROUND';
                 else if (isFinalRound) continueBtn.innerText = 'CLAIM GLORY';
+                else if (inDungeon && !isFinalDungeonRoom) continueBtn.innerText = 'NEXT ROOM';
+                else if (isFinalDungeonRoom) continueBtn.innerText = 'LEAVE DUNGEON';
                 else continueBtn.innerText = 'CONTINUE';
             }
 

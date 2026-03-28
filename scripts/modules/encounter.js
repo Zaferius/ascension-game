@@ -153,7 +153,11 @@ const gameEncounter = {
         if (!this.player || !this.currentEncounter) return;
         const cfg = this.currentEncounter;
         $('encounter-title').innerText = cfg.label || 'ARENA MATCHUP';
-        $('encounter-subtitle').innerText = cfg.source === 'tournament' ? `${cfg.tournamentTheme} Round ${cfg.round}/${cfg.totalRounds}.` : 'Study the matchup before you commit.';
+        $('encounter-subtitle').innerText = cfg.source === 'tournament'
+            ? `${cfg.tournamentTheme} Round ${cfg.round}/${cfg.totalRounds}.`
+            : (cfg.source === 'dungeon'
+                ? `Dungeon Depth ${cfg.dungeonDepth} - Room ${cfg.room}/${cfg.totalRooms}.`
+                : 'Study the matchup before you commit.');
         const retreatBtn = $('btn-encounter-retreat');
         const closeBtn = $('encounter-close');
         if (retreatBtn) {
@@ -193,7 +197,7 @@ const gameEncounter = {
     cancelEncounterPreview() {
         const modal = $('modal-encounter');
         if (modal) modal.classList.add('hidden');
-        if (!this.currentEncounter || this.currentEncounter.source !== 'tournament') this.currentEncounter = null;
+        if (!this.currentEncounter || (this.currentEncounter.source !== 'tournament' && this.currentEncounter.source !== 'dungeon')) this.currentEncounter = null;
     },
     async confirmEncounterPreview() {
         if (!this.currentEncounter) return;

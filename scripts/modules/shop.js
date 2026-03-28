@@ -341,6 +341,184 @@ const gameShop = {
         this.updateShopRefreshIndicator();
         wireButtonSfx($('screen-list'));
     },
+    addConsumableToInventory(def, qty = 1) {
+        if (!this.player || !def || qty <= 0) return;
+        if (!Array.isArray(this.player.inventory)) this.player.inventory = [];
+        const inv = this.player.inventory;
+        const existing = inv.find(it => it && it.type === 'consumable' && it.subType === def.subType);
+        if (existing) {
+            existing.qty = (existing.qty || 0) + qty;
+        } else {
+            inv.push({ id: Date.now() + Math.random(), type: 'consumable', subType: def.subType, name: def.name, icon: def.icon, desc: def.desc, price: def.price, qty, rarity: def.rarity || 'rarity-common' });
+        }
+    },
+    openCombatStore() {
+        if (!this.player) return;
+        this.currentShopType = 'consumable';
+        this.currentTradeMode = 'buy';
+        this.currentListMode = 'combat-store';
+        $('screen-hub').classList.add('hidden');
+        $('screen-list').classList.remove('hidden');
+        this.renderCombatStore();
+        $('shop-gold').innerText = this.player.gold;
+        this.updateTradeToggleUI();
+        wireButtonSfx($('screen-list'));
+    },
+    renderCombatStore() {
+        const cont = $('list-container');
+        const titleEl = $('list-title');
+        const headerExtra = $('list-header-extra');
+        game.ensurePreviewHelpers();
+        const previewBox = $('shop-preview');
+        const buildPreviewFromItem = game._buildItemPreview;
+        const movePreview = game._moveItemPreview;
+        const bindPreview = (el, item) => {
+            if (!el || !previewBox || typeof buildPreviewFromItem !== 'function' || typeof movePreview !== 'function') return;
+            el.onmouseenter = (ev) => {
+                buildPreviewFromItem(item);
+                movePreview(ev);
+                previewBox.classList.remove('hidden');
+                previewBox.classList.add('visible');
+            };
+            el.onmousemove = (ev) => {
+                if (previewBox.classList.contains('visible')) movePreview(ev);
+            };
+            el.onmouseleave = () => {
+                previewBox.classList.remove('visible');
+            };
+        };
+        if (!cont || !titleEl) return;
+        const listPanel = document.querySelector('.list-panel');
+        if (listPanel) listPanel.classList.remove('list-panel--inv');
+        titleEl.innerText = 'COMBAT STORE';
+        const subtitleEl = $('list-title-sub');
+        if (subtitleEl) subtitleEl.innerText = 'Cures for status effects. Assign from Inventory to your bag slots before a fight.';
+        if (headerExtra) headerExtra.innerHTML = '';
+        cont.innerHTML = '';
+
+        // Hide potion slot card (not relevant here)
+        const slotCard = $('inv-bag-card');
+        if (slotCard) { slotCard.classList.add('hidden'); slotCard.innerHTML = ''; }
+
+        if (!Array.isArray(COMBAT_STORE_DEFS) || COMBAT_STORE_DEFS.length === 0) {
+            cont.innerHTML = '<div style="text-align:center;padding:20px;color:#555;">No items available.</div>';
+            return;
+        }
+
+        // --- Cure Consumables ---
+        const cureHeader = document.createElement('div');
+        cureHeader.className = 'combat-store-section-header';
+        cureHeader.textContent = 'STATUS CURES';
+        cont.appendChild(cureHeader);
+
+        COMBAT_STORE_DEFS.forEach(def => {
+            const buyPrice = this.getAdjustedBuyPrice(def);
+            const canAfford = this.player.gold >= buyPrice;
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <div class="item-main-wrap">
+                    <div class="item-card-icon" style="font-size:1.6rem; display:flex; align-items:center; justify-content:center;">${def.icon}</div>
+                    <div class="item-main">
+                        <div class="item-main-name rarity-common">${def.name}</div>
+                        <div class="item-main-sub">${def.desc}</div>
+                    </div>
+                </div>
+                <div><span class="item-chip">Consumable</span></div>
+                <div><span class="item-chip">Cure</span></div>
+                <div class="item-level"><span class="item-chip">Single Use</span></div>
+                <div class="item-price"><span class="text-gold">${buyPrice}</span></div>
+                <div class="item-action"><button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${canAfford ? '' : 'disabled'}>Buy</button></div>
+            `;
+            const btn = row.querySelector('button');
+            if (btn && canAfford) {
+                btn.onclick = () => {
+                    if (!this.player || this.player.gold < buyPrice) return;
+                    this.player.gold -= buyPrice;
+                    $('shop-gold').innerText = this.player.gold;
+                    this.addConsumableToInventory(def, 1);
+                    this.updateHubUI();
+                    this.saveGame();
+                    this.renderCombatStore();
+                    $('shop-gold').innerText = this.player.gold;
+                };
+            }
+            bindPreview(row, def);
+            cont.appendChild(row);
+        });
+
+        // --- Bag Upgrades ---
+        const upgradeHeader = document.createElement('div');
+        upgradeHeader.className = 'combat-store-section-header';
+        upgradeHeader.textContent = 'BAG UPGRADES';
+        cont.appendChild(upgradeHeader);
+
+        const currentCap = this.player.bagCapacity || 8;
+
+        const bagInfoRow = document.createElement('div');
+        bagInfoRow.className = 'combat-store-bag-info';
+        bagInfoRow.innerHTML = `<span>🎒 Current Bag: <strong>${currentCap} slots</strong></span>`;
+        cont.appendChild(bagInfoRow);
+
+        const upgradeTiers = typeof BAG_UPGRADE_TIERS !== 'undefined' ? BAG_UPGRADE_TIERS : [];
+        upgradeTiers.forEach(tier => {
+            const alreadyOwned = currentCap >= tier.toSlots;
+            const isNext = !alreadyOwned && (currentCap === tier.toSlots - 2 || (tier.toSlots === 10 && currentCap <= 8));
+            const canBuy = isNext && this.player.gold >= tier.price;
+
+            const row = document.createElement('div');
+            row.className = `item-row${alreadyOwned ? ' combat-store-owned' : ''}`;
+            row.innerHTML = `
+                <div class="item-main-wrap">
+                    <div class="item-card-icon" style="font-size:1.6rem; display:flex; align-items:center; justify-content:center;">🎒</div>
+                    <div class="item-main">
+                        <div class="item-main-name rarity-uncommon">${tier.label}</div>
+                        <div class="item-main-sub">${tier.desc}</div>
+                    </div>
+                </div>
+                <div><span class="item-chip">Upgrade</span></div>
+                <div><span class="item-chip">${tier.toSlots} slots</span></div>
+                <div class="item-level"><span class="item-chip">Permanent</span></div>
+                <div class="item-price"><span class="text-gold">${alreadyOwned ? '—' : tier.price}</span></div>
+                <div class="item-action">
+                    ${alreadyOwned
+                        ? '<span class="item-chip" style="color:#4caf50;">✓ Owned</span>'
+                        : `<button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${(isNext && canBuy) ? '' : 'disabled'}>${isNext ? 'Buy' : 'Locked'}</button>`
+                    }
+                </div>
+            `;
+            if (!alreadyOwned && isNext) {
+                const btn = row.querySelector('button');
+                if (btn && canBuy) {
+                    btn.onclick = () => {
+                        if (!this.player || this.player.gold < tier.price) return;
+                        this.player.gold -= tier.price;
+                        this.player.bagCapacity = tier.toSlots;
+                        // Extend bagSlots array
+                        if (!Array.isArray(this.player.bagSlots)) this.player.bagSlots = [];
+                        while (this.player.bagSlots.length < tier.toSlots) this.player.bagSlots.push(null);
+                        this.updateHubUI();
+                        this.saveGame();
+                        this.renderCombatStore();
+                        $('shop-gold').innerText = this.player.gold;
+                    };
+                }
+            }
+            bindPreview(row, {
+                type: 'bag_upgrade',
+                rarity: alreadyOwned ? 'rarity-common' : 'rarity-uncommon',
+                name: tier.label,
+                desc: tier.desc,
+                toSlots: tier.toSlots,
+                minLevel: 1,
+                info: alreadyOwned
+                    ? `Already unlocked. Current capacity covers ${tier.toSlots} slots.`
+                    : (isNext ? 'Next available upgrade tier.' : 'Unlock the previous tier first.'),
+                infoColor: alreadyOwned ? 'text-green' : (isNext ? 'text-gold' : 'text-red')
+            });
+            cont.appendChild(row);
+        });
+    },
     openPotionShop() {
         if (!this.player) return;
         this.currentShopType = 'potion';
