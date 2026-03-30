@@ -6,6 +6,12 @@
 // Mixed into game via: const game = { ...gameEncounter, ... }
 
 const gameEncounter = {
+    rollEncounterEnemyLevel(baseLevel, offset = 0) {
+        const referenceLevel = Math.max(1, baseLevel || this.player?.level || 1);
+        const appliedOffset = Math.max(-2, Math.min(2, offset || 0));
+        const variance = rng(-2, 2);
+        return Math.max(1, referenceLevel + variance + appliedOffset);
+    },
     getUnlockedTournamentTier() {
         if (!this.player) return 0;
         return Math.min(MAX_TOURNAMENT_TIER, Math.floor((this.player.level || 1) / 3));
@@ -54,11 +60,18 @@ const gameEncounter = {
         const enemyCount = config.mode === 'duo' ? 2 : 1;
         const enemyGens = [];
         const usedNames = new Set();
+        const allowVariance = config.source !== 'tournament' && !config.fixedLevels;
+        const generator = (config.source === 'dungeon' && typeof generateDungeonEnemyTemplateForLevel === 'function')
+            ? generateDungeonEnemyTemplateForLevel
+            : generateEnemyTemplateForLevel;
         for (let i = 0; i < enemyCount; i++) {
-            const lvl = i === 1
+            const configuredBaseLevel = i === 1
                 ? (config.secondaryEnemyLevel || Math.max(1, (config.enemyLevel || this.player.level) - 1))
                 : (config.enemyLevel || this.player.level);
-            const gen = generateEnemyTemplateForLevel(lvl, usedNames);
+            const lvl = allowVariance
+                ? this.rollEncounterEnemyLevel(configuredBaseLevel, i === 1 ? -1 : 0)
+                : Math.max(1, configuredBaseLevel);
+            const gen = generator(lvl, usedNames);
             if (gen && Array.isArray(config.forcedEnemyNames) && config.forcedEnemyNames[i]) gen.displayName = config.forcedEnemyNames[i];
             enemyGens.push(gen);
         }

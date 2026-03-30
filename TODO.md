@@ -2,18 +2,24 @@
 -Combat sırasında görünen logları biraz daha hikayelestirmeliyiz. Örneğin "You strike the enemy with your sword" yerine "With a mighty swing, you cleave the enemy's armor" gibi daha dramatik ve hikayeli ifadeler kullanabiliriz. Injury / Hastalık yediğimiz anları da böyle loglayalım. örneğin "You feel a sharp pain in your side as a wound festers" yerine "A festering wound on your side throbs with excruciating pain" [SAKATLIK İSMİ] gibi daha dramatik ve hikayeli ifadeler kullanabiliriz. Planlayalım.
 -1. turnuva sırasında tam 3 level atladıgım icin 1. turnuva biter bitmez diğerine girmeye hak kazandım. Bunu biraz dengelemek lazım. 
 -Pot fiyatları?? Test et para hilesi yapmadan.
--Attack puanım 1 olmasına ragmen oldukca fazla vurus ihtimaline sahibim. bunu biraz nerfleyelim.
+-Bazen level atladıktan sonra skill verme ekranı gelmeden dövüşe giriyoruz ve dövüşün başında skill verip devam edebiliyoruz. Level atlama ve skill verme işleri her zaman öncelikli olmalı.
 
 -Achivements.
--Player'in atagı 12 iken düsmanın defansı 6. fakat player'ın vurus ihtimalleri cok fazla. 99 85 73
--Karısımza her zaman aynı level adam cıkmasın bir azı da çıkabilsin 2 fazlası da cıkabilsin. o civarda değişsin.
--Özelligi olmayan common silahların, aynı level özellikli özel silahlara kıyasla ciddi düsük ücretli olması lazım.
+
+
+-Custom silah tasarlama ve üretme mekaniği? PLANLA
+
+
+-----------------
+MAGIC
+-Bazı büyüleri satın alabilmek için oyunda "Scroll" bulmak gerekecek para ve level ile satın alınamayacak öyle şak diye.
 
 
 ##DUNGEONS
 -Dungeonlarda dinamik efektler(oda gecislerinde blur shake falan filan. canlı hissettirsin.)
 -Dungeonda ölen düsmanların loot bırakması(levellara falan uygun drop düsürmesi lazım. silah,armor,trinket,combat store itemleri,potlar,gold) ve envanter(Bag) yönetimi.
 -Dungeon sistemini Section section ayıracagız 1-6 level arası 7 -13 lvl arası gibi.. Dungeon zorluk dengesi buna göre gitmeli düzgün olmalı.
+-Dungeonda oda oda gezerken bir şey buldugumuzda sadece minicik text yazıyor. bunu istemiyoruz. Pencerenin ortasında büyükce bir pencere cıkacak ve odada ne bulduysak göreceğiz. almak istediklerimizi orada alacagız 
 -Dungeon aşırı zor. Test ve düzenleme gerekiyor.
 
 

@@ -298,10 +298,10 @@
                         <button class="btn btn-primary hub-action-btn hub-action-feature hub-action-pit" onclick="game.openPitMenu()"><span class="hub-action-content"><span class="hub-action-title">THE PIT</span><span class="hub-action-sub">Enter the pit and chase gold, XP, and gear.</span></span><span class="hub-action-icon">⚔</span></button>
                         <button class="btn hub-action-btn hub-action-shop hub-action-shop-armor" onclick="game.openShop('armor')"><span class="hub-action-content"><span class="hub-action-title">ARMORY</span><span class="hub-action-sub">Fortify every slot with heavier protection.</span></span><span class="hub-action-icon">🛡</span></button>
                         <button class="btn hub-action-btn hub-action-inventory" onclick="game.openInventory()"><span class="hub-action-content"><span class="hub-action-title">INVENTORY</span><span class="hub-action-sub">Equip, compare, and sort your current haul.</span></span><span class="hub-action-icon">🎒</span></button>
-                        <button class="btn hub-action-btn hub-action-shop hub-action-shop-magic" onclick="game.openShop('trinket')"><span class="hub-action-content"><span class="hub-action-title">MAGIC SHOP</span><span class="hub-action-sub">Browse mystical trinkets, charms, and arcane boosts.</span></span><span class="hub-action-icon">🔮</span></button>
-                        <button class="btn hub-action-btn hub-action-shop hub-action-shop-combat" onclick="game.openCombatStore()"><span class="hub-action-content"><span class="hub-action-title">COMBAT STORE</span><span class="hub-action-sub">Buy cures for Bleed, Poison, and Burn.</span></span><span class="hub-action-icon">🩹</span></button>
+                        <button class="btn hub-action-btn hub-action-shop hub-action-shop-trinket" onclick="game.openShop('trinket')"><span class="hub-action-content"><span class="hub-action-title">TRINKET SHOP</span><span class="hub-action-sub">Browse mystical trinkets, charms, and passive relic boosts.</span></span><span class="hub-action-icon">🔮</span></button>
+                        <button class="btn hub-action-btn hub-action-shop hub-action-shop-combat" onclick="game.openCombatStore()"><span class="hub-action-content"><span class="hub-action-title">COMBAT STORE</span><span class="hub-action-sub">Buy potions, cures for Bleed/Poison/Burn, and field utility.</span></span><span class="hub-action-icon">🩹</span></button>
                         <button class="btn hub-action-btn hub-action-gamble" onclick="gamble.open('blackjack')"><span class="hub-action-content"><span class="hub-action-title">GAMBLE</span><span class="hub-action-sub">Choose between blackjack and hold'em for a shot at fast gold.</span></span><span class="hub-action-icon">🎲</span></button>
-                        <button class="btn hub-action-btn hub-action-shop hub-action-shop-potion" onclick="game.openPotionShop()"><span class="hub-action-content"><span class="hub-action-title">POTION SHOP</span><span class="hub-action-sub">Refill your bag before the next battle.</span></span><span class="hub-action-icon">🧪</span></button>
+                        <button class="btn hub-action-btn hub-action-shop hub-action-shop-magic" onclick="game.openMagicShop()"><span class="hub-action-content"><span class="hub-action-title">MAGIC SHOP</span><span class="hub-action-sub">Visit the arcane archive to acquire battle spells.</span></span><span class="hub-action-icon">✨</span></button>
                     </div>
                 </div>
             </div>
@@ -519,21 +519,24 @@
                 <div class="dungeon-map-panel">
                     <div class="dungeon-map-head">
                         <h3>Section Intel</h3>
+                        <button id="dungeon-intel-toggle" class="btn btn-xs dungeon-panel-toggle" type="button" aria-expanded="false" onclick="game.toggleDungeonPanel('intel')">Expand</button>
+                    </div>
+                    <div id="dungeon-section-panel-body" class="dungeon-collapsible-body hidden">
                         <div id="dungeon-section-range" class="dungeon-section-range">Lv. 1-6</div>
-                    </div>
-                    <div class="dungeon-section-card">
-                        <div class="dungeon-section-kicker">Current Bracket</div>
-                        <div id="dungeon-section-title" class="dungeon-section-title">Section 1 - The Shallows</div>
-                        <p id="dungeon-section-copy" class="dungeon-section-copy">Collapsed cells and weak scavengers.</p>
-                        <div class="dungeon-section-progress"><div id="dungeon-section-progress-fill" class="dungeon-section-progress-fill"></div></div>
-                        <div class="dungeon-section-stats">
-                            <div class="dungeon-section-stat"><span>Threat</span><strong id="dungeon-section-threat">Measured</strong></div>
-                            <div class="dungeon-section-stat"><span>Loot Focus</span><strong id="dungeon-section-loot">Starter gear and curatives</strong></div>
+                        <div class="dungeon-section-card">
+                            <div class="dungeon-section-kicker">Current Bracket</div>
+                            <div id="dungeon-section-title" class="dungeon-section-title">Section 1 - The Shallows</div>
+                            <p id="dungeon-section-copy" class="dungeon-section-copy">Collapsed cells and weak scavengers.</p>
+                            <div class="dungeon-section-progress"><div id="dungeon-section-progress-fill" class="dungeon-section-progress-fill"></div></div>
+                            <div class="dungeon-section-stats">
+                                <div class="dungeon-section-stat"><span>Threat</span><strong id="dungeon-section-threat">Measured</strong></div>
+                                <div class="dungeon-section-stat"><span>Loot Focus</span><strong id="dungeon-section-loot">Starter gear and curatives</strong></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="dungeon-feed-wrap">
-                        <div class="dungeon-feed-headline">Recent Haul</div>
-                        <div id="dungeon-loot-feed" class="dungeon-loot-feed"></div>
+                        <div class="dungeon-feed-wrap">
+                            <div class="dungeon-feed-headline">Recent Haul</div>
+                            <div id="dungeon-loot-feed" class="dungeon-loot-feed"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="dungeon-room-panel">
@@ -542,10 +545,13 @@
                             <div class="dungeon-room-kicker" style="margin-bottom:8px;">Battle Bag</div>
                             <h3 style="margin:0;">Consumables Ready</h3>
                         </div>
-                        <div id="dungeon-bag-meta" class="dungeon-section-range">0 / 8 prepared</div>
+                        <button id="dungeon-bag-toggle" class="btn btn-xs dungeon-panel-toggle" type="button" aria-expanded="false" onclick="game.toggleDungeonPanel('bag')">Expand</button>
                     </div>
-                    <p id="dungeon-bag-caption" class="dungeon-bag-caption">Looted potions and remedies can be packed here before the next room.</p>
-                    <div id="dungeon-bag-grid" class="dungeon-bag-grid"></div>
+                    <div id="dungeon-bag-panel-body" class="dungeon-collapsible-body hidden">
+                        <div id="dungeon-bag-meta" class="dungeon-section-range">0 / 8 prepared</div>
+                        <p id="dungeon-bag-caption" class="dungeon-bag-caption">Looted potions and remedies can be packed here before the next room.</p>
+                        <div id="dungeon-bag-grid" class="dungeon-bag-grid"></div>
+                    </div>
                 </div>
             </div>
             <div id="dungeon-player-strip" class="dungeon-player-strip"></div>

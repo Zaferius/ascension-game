@@ -277,9 +277,18 @@ Dungeon behavior:
 
 - dungeon flow lives in `scripts/modules/dungeon.js`
 - runs are text-driven and choice-based rather than map-driven
+- dungeon difficulty is now split into level sections such as `1-6`, `7-13`, `14-20`, and higher endgame brackets
+- each section defines its own threat profile, loot focus, and encounter scaling window
 - rooms can branch into multiple passages such as left, center, or right
 - room types currently include combat, elite, event, rest, treasure, and boss
+- `Section Intel` and `Battle Bag` panels are now collapsible and default to closed so the dungeon screen starts cleaner
 - combat rooms skip the normal encounter preview and drop directly into battle after in-room narration
+- dungeon combat victories now generate loot bundles with level-appropriate drops
+- possible dungeon drops include gold, weapons, armor, trinkets, potions, and combat-store cure items
+- hidden chests can appear in chambers; opening them requires an `Iron Key` from the Combat Store
+- dungeon encounters now use a creature-biased enemy pool (rats/hounds/goblins/skeletons), with rare human thieves/bandits
+- elite and boss rooms guarantee stronger loot pressure than normal chambers
+- dungeon loot first goes to inventory, then can be equipped or packed into the bag from the victory UI
 - once a dungeon run is abandoned or the game is reloaded, that run is discarded and must be restarted
 - dungeon progression tracks permanent player milestones such as `dungeonsCompleted` and `deepestDungeonDepth`
 
@@ -308,6 +317,7 @@ The shop system currently handles:
 - duplicate limiting
 - legendary caps
 - potion stock generation
+- combat store consumables (status cures, bag upgrades, and dungeon utility such as `Iron Key`)
 - price adjustment from charisma-related effects
 - buy/sell flows
 
@@ -317,6 +327,8 @@ Notable design details:
 - legendary weapons use generated names
 - weapon affixes can add DOT/status behavior
 - potion inventory is stack-based
+- the player bag is a separate prepared-consumable layer on top of inventory storage
+- dungeon loot can feed directly into both inventory management and pre-combat bag preparation
 
 ---
 
@@ -561,7 +573,9 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 - the overall game window and active play area were increased
 - hub action cards were reorganized into a clearer two-column structure
 - all shop-related buttons were grouped on the right side
-- `Potion Shop` now sits below `Combat Store`
+- the old trinket-facing `Magic Shop` was renamed to `Trinket Shop`
+- `Potion Shop` was removed from the hub, and potion purchases were moved into `Combat Store`
+- a new placeholder `Magic Shop` entry now sits below `Combat Store`
 - `Iron City Tournament` now appears above `The Pit`
 
 ### Inventory bag UI
@@ -579,7 +593,8 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 ### Tooltip behavior
 
 - `Combat Store` items now use the shared item tooltip/preview system
-- cure consumables and bag upgrades display the same hover-preview style used elsewhere in the game
+- potions, cure consumables, and bag upgrades display the same hover-preview style used elsewhere in the game
+- dungeon `Battle Bag` cards also use the shared hover-preview tooltip behavior
 
 ### Scrollbar styling
 
@@ -603,6 +618,13 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 - room choices are presented as passages rather than exposed room contents, preserving surprise
 - entering a combat room shows a short warning beat before combat starts for extra tension
 - the dungeon UI includes a centered player status strip showing name, level, HP, and armor
+- the dungeon screen now also includes `Section Intel`, a `Recent Haul` loot feed, and a dedicated `Battle Bag` panel
+- both `Section Intel` and `Battle Bag` are now default-collapsed and can be expanded on demand
+- section intel shows the active level bracket, danger tier, loot bias, and current progress inside that bracket
+- loot earned in dungeon combat is surfaced inside the victory modal with quick actions like `EQUIP NOW` and `STASH TO BAG`
+- bag preparation can now happen naturally during the run by moving newly looted potions and remedies into ready slots
+- hidden treasure chests can spawn during room entries; `Iron Key` consumables from Combat Store unlock them for bonus loot
+- dungeon enemy generation now favors creatures (rat/hound/goblin/skeleton) with occasional human thief/bandit spawns
 - players can step back from an unopened chamber before committing, but abandoned runs are not persistent
 
 ---
@@ -616,7 +638,7 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 - `server.js` - multiplayer WebSocket server
 - `scripts/core/player.js` - player stats and progression source of truth
 - `scripts/modules/combat.js` - combat engine
-- `scripts/modules/dungeon.js` - dungeon crawling flow and room state
+- `scripts/modules/dungeon.js` - dungeon crawling flow, section scaling, loot bundles, and run-specific bag UX
 - `scripts/modules/encounter.js` - pit/tournament/injury flow
 - `scripts/modules/shop.js` - shop and potion economy
 - `scripts/modules/save_load.js` - save slots and migration logic

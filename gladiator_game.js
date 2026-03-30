@@ -1072,7 +1072,7 @@ const game = {
             let subtitle = 'Browse this shop stock.';
             if (type === 'weapon') title = 'WEAPONSMITH';
             else if (type === 'armor') title = 'ARMOR';
-            else if (type === 'trinket') title = 'MAGIC SHOP';
+            else if (type === 'trinket') title = 'TRINKET SHOP';
             else if (type === 'potion') title = 'POTION SHOP';
             if (this.currentTradeMode === 'sell') title += ' - SELL';
             $('list-title').innerText = title;
@@ -1080,7 +1080,7 @@ const game = {
             if (subtitleEl) {
                 if (type === 'weapon') subtitle = 'Trade steel, compare edges, and hunt for stronger weapon rolls.';
                 else if (type === 'armor') subtitle = 'Layer protection piece by piece and read your upgrade gaps at a glance.';
-                else if (type === 'trinket') subtitle = 'Browse arcane curios, passive boons, and mystical utility pieces.';
+                else if (type === 'trinket') subtitle = 'Browse mystical trinkets, passive relic boons, and utility charms.';
                 else if (type === 'potion') subtitle = 'Refill field supplies and prepare for the next stretch of bloodshed.';
                 if (this.currentTradeMode === 'sell') subtitle = 'Trade away matching gear from your inventory for fast coin.';
                 subtitleEl.innerText = subtitle;

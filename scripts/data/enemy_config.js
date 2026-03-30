@@ -45,6 +45,27 @@ const ENEMY_TEMPLATES = [
         avatarKey: 'skeleton',
         statWeights: { str: 2, atk: 3, def: 3, vit: 1 },
         weaponClass: 'Spear'
+    },
+    {
+        key: 'rat',
+        name: 'Plague Rat',
+        avatarKey: 'rat',
+        statWeights: { str: 1, atk: 4, def: 1, vit: 2 },
+        weaponClass: 'Dagger'
+    },
+    {
+        key: 'hound',
+        name: 'Dungeon Hound',
+        avatarKey: 'hound',
+        statWeights: { str: 3, atk: 4, def: 1, vit: 2 },
+        weaponClass: 'Axe'
+    },
+    {
+        key: 'thief',
+        name: 'Tunnel Thief',
+        avatarKey: 'thief',
+        statWeights: { str: 2, atk: 4, def: 2, vit: 2 },
+        weaponClass: 'Dagger'
     }
 ];
 
@@ -54,8 +75,38 @@ const ENEMY_NAME_PREFIXES = {
     marauder: ['Grimmaw', 'Bloodhide', 'Stonefist', 'Ravager', 'Ironscar', 'Dreadhook', 'Skullbrand', 'Warclaw'],
     orc: ['Ironjaw', 'Bloodtusk', 'Skullsplitter', 'Grudgeborn', 'Goremaw', 'Warfang', 'Stonejaw', 'Grimtusk'],
     paladin: ['Ashveil', 'Oathscar', 'Hollowbrand', 'Cindervow', 'Graveshield', 'Duskward', 'Palecrest', 'Blackvigil'],
-    skeleton: ['Bonegrin', 'Graveshard', 'Ashbone', 'Hollowjaw', 'Dreadrattle', 'Cryptfang', 'Bleakskull', 'Rattlebrand']
+    skeleton: ['Bonegrin', 'Graveshard', 'Ashbone', 'Hollowjaw', 'Dreadrattle', 'Cryptfang', 'Bleakskull', 'Rattlebrand'],
+    rat: ['Sewerfang', 'Carriontooth', 'Filthtail', 'Moldbite', 'Scabclaw', 'Blightwhisker', 'Ruinmaw', 'Rotsnout'],
+    hound: ['Ashfang', 'Chainmaw', 'Pitfang', 'Rendhide', 'Bonejaw', 'Gorepelt', 'Rustfang', 'Rimehowl'],
+    thief: ['Quickhand', 'Grinshade', 'Lockjaw', 'Dustcloak', 'Rookfinger', 'Nightpalm', 'Coinknife', 'Skulkscar']
 };
+
+const DUNGEON_ENEMY_POOL = [
+    { key: 'rat', weight: 30 },
+    { key: 'hound', weight: 24 },
+    { key: 'goblin', weight: 18 },
+    { key: 'skeleton', weight: 14 },
+    { key: 'orc', weight: 8 },
+    { key: 'thief', weight: 4 },
+    { key: 'bandit', weight: 2 }
+];
+
+function pickTemplateByWeightedPool(pool = []) {
+    if (!Array.isArray(pool) || !pool.length) return null;
+    const totalWeight = pool.reduce((sum, entry) => sum + Math.max(0, entry.weight || 0), 0);
+    if (totalWeight <= 0) return null;
+    let roll = Math.random() * totalWeight;
+    for (const entry of pool) {
+        const w = Math.max(0, entry.weight || 0);
+        if (roll < w) {
+            const found = ENEMY_TEMPLATES.find(t => t.key === entry.key);
+            return found || null;
+        }
+        roll -= w;
+    }
+    const fallback = pool[pool.length - 1];
+    return ENEMY_TEMPLATES.find(t => t.key === fallback.key) || null;
+}
 
 const ENEMY_STAT_TITLES = {
     str: ['the Brutal', 'the Crusher', 'the Savage', 'the Butcher'],
@@ -151,6 +202,15 @@ function generateEnemyDisplayName(template, stats, usedNames = new Set()) {
 function generateEnemyTemplateForLevel(level, usedNames) {
     const lvl = Math.max(1, level || 1);
     const tpl = ENEMY_TEMPLATES[Math.floor(Math.random() * ENEMY_TEMPLATES.length)];
+    const stats = allocateEnemyStats(tpl, lvl);
+    const displayName = generateEnemyDisplayName(tpl, stats, usedNames instanceof Set ? usedNames : new Set());
+    return { template: tpl, level: lvl, stats, displayName };
+}
+
+function generateDungeonEnemyTemplateForLevel(level, usedNames) {
+    const lvl = Math.max(1, level || 1);
+    const tpl = pickTemplateByWeightedPool(DUNGEON_ENEMY_POOL)
+        || ENEMY_TEMPLATES[Math.floor(Math.random() * ENEMY_TEMPLATES.length)];
     const stats = allocateEnemyStats(tpl, lvl);
     const displayName = generateEnemyDisplayName(tpl, stats, usedNames instanceof Set ? usedNames : new Set());
     return { template: tpl, level: lvl, stats, displayName };

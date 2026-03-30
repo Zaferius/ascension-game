@@ -744,6 +744,15 @@ const combat = {
             return;
         }
 
+        if (slot.type === 'consumable') {
+            const itemName = slot.name || 'Consumable';
+            this.logMessage(`${itemName} cannot be used during combat.`);
+            this.closeBag();
+            this.actionLock = false;
+            if (acts) { acts.style.opacity = '1'; acts.style.pointerEvents = 'auto'; }
+            return;
+        }
+
         const type = slot.subType === 'armor' ? 'armor' : 'hp';
         if (type === 'hp') {
             const pct = (slot.percent || 0) / 100;
@@ -897,9 +906,9 @@ const combat = {
                 : (!this.targetSelectionActive ? activeTarget : null);
             if (previewEnemy) {
                 const hit = this.calcHit(game.player.getEffectiveAtk(), previewEnemy.def) + game.player.getHitBonus();
-                const q = Math.max(5, Math.min(99, hit + 18));
+                const q = Math.max(5, Math.min(99, hit + 12));
                 const n = Math.max(5, Math.min(99, hit));
-                const p = Math.max(5, Math.min(99, hit - 12));
+                const p = Math.max(5, Math.min(99, hit - 10));
                 $('hit-quick').innerText = q + "%"; $('hit-normal').innerText = n + "%"; $('hit-power').innerText = p + "%";
             } else {
                 $('hit-quick').innerText = '--'; $('hit-normal').innerText = '--'; $('hit-power').innerText = '--';
@@ -978,17 +987,17 @@ const combat = {
         }, 220);
     },
     calcHit(atk, def) {
-        // Base değeri daha da düşük, ATK-DEF farkına göre hit % hesapla
-        // Alt sınır: hiçbir zaman %5'in altına düşmesin
-        const base = 55 + (atk - def) * 5;
+        // Daha kontrollü bir temel doğruluk: ATK üstünlüğü hala önemli,
+        // ancak küçük farklarda aşırı yüksek yüzde oluşmasın.
+        const base = 51 + (atk - def) * 4;
         return Math.max(5, Math.min(99, base));
     },
     getPlayerAttackProfile(type) {
         if (type === 'quick') {
-            return { hitBonus: 18, damageMult: 0.82, shake: 'shake-sm', blur: 'combat-blur-sm', impactDuration: 260, hitStopMs: 40, particleColor: 'rgba(180,220,255,0.95)', slashColor: 'rgba(255,255,255,0.95)', impactSize: 180 };
+            return { hitBonus: 12, damageMult: 0.82, shake: 'shake-sm', blur: 'combat-blur-sm', impactDuration: 260, hitStopMs: 40, particleColor: 'rgba(180,220,255,0.95)', slashColor: 'rgba(255,255,255,0.95)', impactSize: 180 };
         }
         if (type === 'power') {
-            return { hitBonus: -12, damageMult: 1.35, shake: 'shake-lg', blur: 'combat-blur-lg', impactDuration: 500, hitStopMs: 90, particleColor: 'rgba(255,138,101,0.95)', slashColor: 'rgba(255,214,140,0.95)', impactSize: 300 };
+            return { hitBonus: -10, damageMult: 1.35, shake: 'shake-lg', blur: 'combat-blur-lg', impactDuration: 500, hitStopMs: 90, particleColor: 'rgba(255,138,101,0.95)', slashColor: 'rgba(255,214,140,0.95)', impactSize: 300 };
         }
         return { hitBonus: 0, damageMult: 1, shake: 'shake-md', blur: 'combat-blur-md', impactDuration: 380, hitStopMs: 58, particleColor: 'rgba(255,236,179,0.95)', slashColor: 'rgba(255,255,255,0.9)', impactSize: 230 };
     },

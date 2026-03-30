@@ -6,6 +6,7 @@ const COMBAT_STORE_DEFS = [
     { key: 'bandage',          type: 'consumable',  subType: 'cure_bleed',  name: 'Bandage',         icon: '🩹', desc: 'Removes the Bleed effect.',   price: 20,   rarity: 'rarity-common' },
     { key: 'antivenom',        type: 'consumable',  subType: 'cure_poison', name: 'Antivenom',        icon: '☠', desc: 'Removes the Poison effect.',  price: 20,   rarity: 'rarity-common' },
     { key: 'antifire_blanket', type: 'consumable',  subType: 'cure_burn',   name: 'Antifire Blanket', icon: '🧯', desc: 'Removes the Burn effect.',    price: 25,   rarity: 'rarity-common' },
+    { key: 'dungeon_key',      type: 'consumable',  subType: 'dungeon_key', name: 'Iron Key',         icon: '🗝', desc: 'Opens hidden dungeon treasure chests.', price: 45, rarity: 'rarity-uncommon' },
 ];
 
 const BAG_UPGRADE_TIERS = [

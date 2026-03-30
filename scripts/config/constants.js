@@ -19,7 +19,10 @@ const ENEMY_AVATARS = {
     marauder: 'assets/images/ingame-avatars/marauder1.jpeg',
     orc:      'assets/images/ingame-avatars/orc1.jpeg',
     paladin:  'assets/images/ingame-avatars/paladin1.jpeg',
-    skeleton: 'assets/images/ingame-avatars/skeleton1.jpeg'
+    skeleton: 'assets/images/ingame-avatars/skeleton1.jpeg',
+    rat:      'assets/images/ingame-avatars/goblin1.jpeg',
+    hound:    'assets/images/ingame-avatars/orc1.jpeg',
+    thief:    'assets/images/ingame-avatars/bandit1.jpeg'
 };
 
 const INTRO_SCRIPT = {

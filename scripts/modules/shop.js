@@ -392,7 +392,7 @@ const gameShop = {
         if (listPanel) listPanel.classList.remove('list-panel--inv');
         titleEl.innerText = 'COMBAT STORE';
         const subtitleEl = $('list-title-sub');
-        if (subtitleEl) subtitleEl.innerText = 'Cures for status effects. Assign from Inventory to your bag slots before a fight.';
+        if (subtitleEl) subtitleEl.innerText = 'Potions, cures, and utility supplies. Dungeon keys can unlock hidden treasure chests during descent.';
         if (headerExtra) headerExtra.innerHTML = '';
         cont.innerHTML = '';
 
@@ -405,13 +405,89 @@ const gameShop = {
             return;
         }
 
+        // --- Potions ---
+        const potionHeader = document.createElement('div');
+        potionHeader.className = 'combat-store-section-header';
+        potionHeader.textContent = 'POTIONS';
+        cont.appendChild(potionHeader);
+
+        if ((this.shopFightCount - this.lastPotionFightReset) >= POTION_REFRESH_INTERVAL || !this.potionStock || Object.keys(this.potionStock).length === 0) {
+            this.generatePotionStock();
+        }
+
+        const potionEntries = Object.values(this.potionStock || {});
+        if (!potionEntries.length) {
+            const emptyPotions = document.createElement('div');
+            emptyPotions.className = 'combat-store-bag-info';
+            emptyPotions.innerHTML = '<span>No potions available.</span>';
+            cont.appendChild(emptyPotions);
+        } else {
+            potionEntries.forEach(entry => {
+                const { tpl, qty } = entry;
+                const buyPrice = this.getAdjustedBuyPrice({ price: entry.price });
+                const canAfford = this.player.gold >= buyPrice;
+                const inStock = qty > 0;
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                row.innerHTML = `
+                    <div class="item-main-wrap">
+                        <div class="item-card-icon">🧪</div>
+                        <div class="item-main">
+                            <div class="item-main-name rarity-common">${tpl.name} <span class="potion-stock-count">x ${qty}</span></div>
+                            <div class="item-main-sub">Restores ${tpl.percent}% ${tpl.subType === 'armor' ? 'armor' : 'health'} in combat.</div>
+                        </div>
+                    </div>
+                    <div><span class="item-chip">Potion</span></div>
+                    <div><span class="item-chip">${tpl.subType === 'armor' ? 'Armor' : 'Health'}</span></div>
+                    <div class="item-level"><span class="item-chip">${tpl.percent}%</span></div>
+                    <div class="item-price"><span class="text-gold">${buyPrice}</span></div>
+                    <div class="item-action"><button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${(canAfford && inStock) ? '' : 'disabled'}>Buy</button></div>
+                `;
+
+                const btn = row.querySelector('button');
+                if (btn && canAfford && inStock) {
+                    btn.onclick = () => {
+                        if (!this.player || this.player.gold < buyPrice || entry.qty <= 0) return;
+                        this.player.gold -= buyPrice;
+                        entry.qty -= 1;
+                        this.addPotionToInventory({
+                            type: 'potion',
+                            subType: tpl.subType,
+                            percent: tpl.percent,
+                            name: tpl.name,
+                            price: buyPrice,
+                            rarity: 'rarity-common'
+                        }, 1);
+                        this.updateHubUI();
+                        this.saveGame();
+                        this.renderCombatStore();
+                        $('shop-gold').innerText = this.player.gold;
+                    };
+                }
+
+                bindPreview(row, {
+                    type: 'potion',
+                    rarity: 'rarity-common',
+                    name: tpl.name,
+                    subType: tpl.subType,
+                    percent: tpl.percent,
+                    price: buyPrice
+                });
+                cont.appendChild(row);
+            });
+        }
+
         // --- Cure Consumables ---
         const cureHeader = document.createElement('div');
         cureHeader.className = 'combat-store-section-header';
         cureHeader.textContent = 'STATUS CURES';
         cont.appendChild(cureHeader);
 
-        COMBAT_STORE_DEFS.forEach(def => {
+        const defs = Array.isArray(COMBAT_STORE_DEFS) ? COMBAT_STORE_DEFS : [];
+        const cureDefs = defs.filter(def => def && def.subType !== 'dungeon_key');
+        const utilityDefs = defs.filter(def => def && def.subType === 'dungeon_key');
+
+        cureDefs.forEach(def => {
             const buyPrice = this.getAdjustedBuyPrice(def);
             const canAfford = this.player.gold >= buyPrice;
             const row = document.createElement('div');
@@ -446,6 +522,49 @@ const gameShop = {
             bindPreview(row, def);
             cont.appendChild(row);
         });
+
+        if (utilityDefs.length) {
+            const utilityHeader = document.createElement('div');
+            utilityHeader.className = 'combat-store-section-header';
+            utilityHeader.textContent = 'DUNGEON UTILITY';
+            cont.appendChild(utilityHeader);
+
+            utilityDefs.forEach(def => {
+                const buyPrice = this.getAdjustedBuyPrice(def);
+                const canAfford = this.player.gold >= buyPrice;
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                row.innerHTML = `
+                    <div class="item-main-wrap">
+                        <div class="item-card-icon" style="font-size:1.6rem; display:flex; align-items:center; justify-content:center;">${def.icon || '🧰'}</div>
+                        <div class="item-main">
+                            <div class="item-main-name ${def.rarity || 'rarity-common'}">${def.name}</div>
+                            <div class="item-main-sub">${def.desc || ''}</div>
+                        </div>
+                    </div>
+                    <div><span class="item-chip">Consumable</span></div>
+                    <div><span class="item-chip">Key Item</span></div>
+                    <div class="item-level"><span class="item-chip">Dungeon Use</span></div>
+                    <div class="item-price"><span class="text-gold">${buyPrice}</span></div>
+                    <div class="item-action"><button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${canAfford ? '' : 'disabled'}>Buy</button></div>
+                `;
+                const btn = row.querySelector('button');
+                if (btn && canAfford) {
+                    btn.onclick = () => {
+                        if (!this.player || this.player.gold < buyPrice) return;
+                        this.player.gold -= buyPrice;
+                        $('shop-gold').innerText = this.player.gold;
+                        this.addConsumableToInventory(def, 1);
+                        this.updateHubUI();
+                        this.saveGame();
+                        this.renderCombatStore();
+                        $('shop-gold').innerText = this.player.gold;
+                    };
+                }
+                bindPreview(row, def);
+                cont.appendChild(row);
+            });
+        }
 
         // --- Bag Upgrades ---
         const upgradeHeader = document.createElement('div');
@@ -519,20 +638,39 @@ const gameShop = {
             cont.appendChild(row);
         });
     },
-    openPotionShop() {
+    openMagicShop() {
         if (!this.player) return;
-        this.currentShopType = 'potion';
+        this.currentShopType = 'magic';
         this.currentTradeMode = 'buy';
-        this.currentListMode = 'potion';
-        if ((this.shopFightCount - this.lastPotionFightReset) >= POTION_REFRESH_INTERVAL || !this.potionStock || Object.keys(this.potionStock).length === 0) {
-            this.generatePotionStock();
-        }
+        this.currentListMode = 'magic-shop';
         $('screen-hub').classList.add('hidden');
         $('screen-list').classList.remove('hidden');
-        this.renderPotionShop();
+        this.renderMagicShop();
         $('shop-gold').innerText = this.player.gold;
         this.updateTradeToggleUI();
-        this.updatePotionRefreshIndicator();
         wireButtonSfx($('screen-list'));
+    },
+    renderMagicShop() {
+        const cont = $('list-container');
+        const titleEl = $('list-title');
+        const headerExtra = $('list-header-extra');
+        if (!cont || !titleEl) return;
+        const listPanel = document.querySelector('.list-panel');
+        if (listPanel) listPanel.classList.remove('list-panel--inv');
+        titleEl.innerText = 'MAGIC SHOP';
+        const subtitleEl = $('list-title-sub');
+        if (subtitleEl) subtitleEl.innerText = 'Arcane spell market is under preparation. Spell inventory will be added next.';
+        if (headerExtra) headerExtra.innerHTML = '';
+        cont.innerHTML = `
+            <div style="text-align:center; padding:28px 20px; color:#a79ad8; border:1px solid rgba(129,98,187,0.45); background:rgba(34,22,52,0.38); border-radius:10px;">
+                <div style="font-size:1.35rem; margin-bottom:8px;">✨ MAGIC SHOP</div>
+                <div style="color:#c6baf0; font-size:0.92rem;">Arcane tomes are being cataloged. Spell entries will arrive in the next update.</div>
+            </div>
+        `;
+    },
+    openPotionShop() {
+        // Legacy entry point kept for compatibility; potions now live in Combat Store.
+        if (!this.player) return;
+        this.openCombatStore();
     },
 };

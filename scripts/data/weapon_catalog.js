@@ -44,7 +44,7 @@ const RARITY_CONFIG = {
   common: {
     key: 'common',
     css: 'rarity-common',
-    dmgMult: 1.0,
+    dmgMult: 0.94,
     statBudget: 0,
     prefixes: ['Worn', 'Cracked', 'Honed', 'Weathered', 'Scarred']
   },
@@ -350,6 +350,13 @@ function generateRandomWeapons() {
   const out = [];
   let idx = 0;
 
+  const applyWeaponPriceByRarity = (basePrice, rarityKey, dotAffix) => {
+    let adjusted = basePrice;
+    if (rarityKey === 'common') adjusted *= 0.62;
+    if (dotAffix) adjusted *= 1.12;
+    return Math.max(1, Math.round(adjusted));
+  };
+
   // Non-legendary: normal loop
   for (const base of BASE_WEAPON_TYPES) {
     for (let itemLevel = 1; itemLevel <= 10; itemLevel++) {
@@ -362,7 +369,7 @@ function generateRandomWeapons() {
         const avg = dmg.avg;
         const dotAffix = rollWeaponDotAffix(base.weaponClass, rarityKey);
         const basePrice = priceFrom(avg, itemLevel, rarity.dmgMult);
-        const price = weaponTradeoffAdjustedPrice(Math.round(basePrice * (dotAffix ? 1.12 : 1)), statMods);
+        const price = weaponTradeoffAdjustedPrice(applyWeaponPriceByRarity(basePrice, rarityKey, dotAffix), statMods);
         const minShopLevel = determineMinShopLevel(avg);
         const name = buildName(base.baseType, rarityKey, statMods, statRoll.profile);
         const key = `gen_${base.key}_${rarityKey}_l${itemLevel}_${idx++}`;
@@ -395,7 +402,7 @@ function generateRandomWeapons() {
       const avg = dmg.avg;
       const dotAffix = arch.dotAffix ? { ...arch.dotAffix } : null;
       const basePrice = priceFrom(avg, itemLevel, legendaryRarity.dmgMult);
-      const price = weaponTradeoffAdjustedPrice(Math.round(basePrice * (dotAffix ? 1.12 : 1)), statMods);
+      const price = weaponTradeoffAdjustedPrice(applyWeaponPriceByRarity(basePrice, 'legendary', dotAffix), statMods);
       const minShopLevel = Math.max(4, determineMinShopLevel(avg));
       const key = `gen_legendary_${arch.name.replace(/\s+/g, '_').toLowerCase()}_l${itemLevel}_${idx++}`;
       out.push({

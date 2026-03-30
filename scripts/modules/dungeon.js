@@ -5,6 +5,126 @@
 // Mixed into game via: const game = { ...gameDungeon, ... }
 
 const gameDungeon = {
+    ensureDungeonPanelState() {
+        if (!this._dungeonPanelState || typeof this._dungeonPanelState !== 'object') {
+            this._dungeonPanelState = { intel: false, bag: false };
+        }
+        if (typeof this._dungeonPanelState.intel !== 'boolean') this._dungeonPanelState.intel = false;
+        if (typeof this._dungeonPanelState.bag !== 'boolean') this._dungeonPanelState.bag = false;
+        return this._dungeonPanelState;
+    },
+    toggleDungeonPanel(panelKey) {
+        const state = this.ensureDungeonPanelState();
+        if (panelKey !== 'intel' && panelKey !== 'bag') return;
+        state[panelKey] = !state[panelKey];
+        this.applyDungeonPanelState();
+    },
+    applyDungeonPanelState() {
+        const state = this.ensureDungeonPanelState();
+        const setPanel = (key, bodyId, toggleId, label) => {
+            const body = $(bodyId);
+            const toggle = $(toggleId);
+            const expanded = !!state[key];
+            if (body) body.classList.toggle('hidden', !expanded);
+            if (toggle) {
+                toggle.innerText = expanded ? 'Collapse' : 'Expand';
+                toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                toggle.title = `${expanded ? 'Hide' : 'Show'} ${label}`;
+            }
+        };
+        setPanel('intel', 'dungeon-section-panel-body', 'dungeon-intel-toggle', 'Section Intel panel');
+        setPanel('bag', 'dungeon-bag-panel-body', 'dungeon-bag-toggle', 'Battle Bag panel');
+    },
+    getDungeonKeyInventoryEntry() {
+        if (!this.player || !Array.isArray(this.player.inventory)) return null;
+        return this.player.inventory.find(it => it && it.type === 'consumable' && it.subType === 'dungeon_key' && (it.qty || 0) > 0) || null;
+    },
+    getDungeonKeyCount() {
+        const entry = this.getDungeonKeyInventoryEntry();
+        return entry ? Math.max(0, entry.qty || 0) : 0;
+    },
+    consumeDungeonKey(qty = 1) {
+        if (!this.player || !Array.isArray(this.player.inventory) || qty <= 0) return false;
+        const entry = this.getDungeonKeyInventoryEntry();
+        if (!entry || (entry.qty || 0) < qty) return false;
+        entry.qty -= qty;
+        if (entry.qty <= 0) this.player.inventory.splice(this.player.inventory.indexOf(entry), 1);
+        return true;
+    },
+    rollHiddenChestForNode(node) {
+        if (!node || node.type === 'entrance' || node.type === 'boss') return null;
+        if (node.hiddenChest) return node.hiddenChest;
+        const chanceByType = { combat: 0.22, elite: 0.34, event: 0.2, rest: 0.14, treasure: 0.28 };
+        const chestChance = chanceByType[node.type] || 0.18;
+        const hasChest = Math.random() < chestChance;
+        node.hiddenChest = {
+            exists: hasChest,
+            opened: false,
+            attemptedWithoutKey: false,
+            foundText: hasChest ? 'A hidden iron chest is tucked into the shadows of this chamber.' : ''
+        };
+        return node.hiddenChest;
+    },
+    resolveHiddenChestInRoom(node) {
+        const chest = this.rollHiddenChestForNode(node);
+        if (!chest || !chest.exists || chest.opened) return null;
+
+        const keyCount = this.getDungeonKeyCount();
+        if (keyCount <= 0) {
+            chest.attemptedWithoutKey = true;
+            return {
+                opened: false,
+                text: 'A locked iron chest blocks your reach, but you carry no key. The haul stays sealed.',
+                status: 'Hidden chest found, but it is locked.'
+            };
+        }
+
+        if (!this.consumeDungeonKey(1)) {
+            return {
+                opened: false,
+                text: 'Your key ring comes up empty at the last second. The chest remains sealed.',
+                status: 'Hidden chest failed to open.'
+            };
+        }
+
+        chest.opened = true;
+        const dungeonDepth = this.currentDungeon?.depth || 1;
+        const sectionTier = this.currentDungeon?.section?.tier || 1;
+        const chestGold = 28 + dungeonDepth * 14 + sectionTier * 9 + (node.floor || 0) * 8;
+        this.player.gold += chestGold;
+        const reward = this.getDungeonTreasureReward();
+        const entries = [];
+        if (reward && reward.kind === 'potion') {
+            this.addPotionToInventory(reward.data, 1);
+            entries.push({ kind: 'potion', name: reward.data.name });
+        }
+        if (reward && reward.kind === 'consumable') {
+            this.addConsumableToInventory(reward.data, 1);
+            entries.push({ kind: 'consumable', name: reward.data.name });
+        }
+
+        const chestBundle = {
+            id: `dungeon-chest-${Date.now()}-${Math.random()}`,
+            nodeId: node.id,
+            nodeLabel: `${node.label} (Hidden Chest)`,
+            nodeType: 'treasure',
+            sectionName: this.currentDungeon?.section?.name || 'Unknown Section',
+            goldTotal: chestGold,
+            entries: entries.length ? entries : [{ kind: 'gold', name: `Coin Cache (+${chestGold} gold)` }]
+        };
+        if (this.currentDungeon) {
+            if (!Array.isArray(this.currentDungeon.lootHistory)) this.currentDungeon.lootHistory = [];
+            this.currentDungeon.lootHistory.unshift(chestBundle);
+            this.currentDungeon.lootHistory = this.currentDungeon.lootHistory.slice(0, 6);
+        }
+
+        const rewardName = entries.length ? entries.map(e => e.name).join(', ') : 'coin cache';
+        return {
+            opened: true,
+            text: `You unlock a hidden chest with an Iron Key and claim ${chestGold} gold${rewardName ? ` plus ${rewardName}` : ''}.`,
+            status: `Hidden chest opened: +${chestGold} gold.`
+        };
+    },
     getDungeonDepth() {
         return this.getDungeonSectionForLevel(this.player?.level || 1).tier;
     },
@@ -198,6 +318,9 @@ const gameDungeon = {
         const dungeonScreen = $('screen-dungeon');
         if (dungeonScreen) dungeonScreen.classList.remove('hidden');
         this._dungeonCombatPending = false;
+        const panelState = this.ensureDungeonPanelState();
+        panelState.intel = false;
+        panelState.bag = false;
         this.renderDungeonScreen();
         if (typeof stopFightMusic === 'function') stopFightMusic();
         wireButtonSfx(dungeonScreen);
@@ -319,7 +442,7 @@ const gameDungeon = {
         $('dungeon-bag-grid').innerHTML = bagSlots.map((slot, index) => {
             if (!slot) {
                 return `
-                    <div class="dungeon-bag-slot is-empty">
+                    <div class="dungeon-bag-slot is-empty" data-bag-slot-index="${index}">
                         <div class="dungeon-bag-slot-index">Slot ${index + 1}</div>
                         <div class="dungeon-bag-slot-name">Empty</div>
                         <div class="dungeon-bag-slot-copy">Ready for loot</div>
@@ -331,7 +454,7 @@ const gameDungeon = {
                 ? slot.name
                 : `${slot.subType === 'armor' ? 'Armor' : 'Health'} ${slot.percent || 0}%`;
             return `
-                <div class="dungeon-bag-slot ${slot.rarity || 'rarity-common'}">
+                <div class="dungeon-bag-slot ${slot.rarity || 'rarity-common'}" data-bag-slot-index="${index}">
                     <button class="btn btn-xs dungeon-bag-slot-clear" onclick="game.returnBagSlotToInventory(${index})">REMOVE</button>
                     <div class="dungeon-bag-slot-index">Slot ${index + 1}</div>
                     <div class="dungeon-bag-slot-name">${icon} ${detail}</div>
@@ -339,6 +462,40 @@ const gameDungeon = {
                 </div>
             `;
         }).join('');
+        this.ensurePreviewHelpers?.();
+        const previewBox = $('shop-preview');
+        const previewBody = $('shop-preview-body');
+        const buildPreviewFromItem = this._buildItemPreview;
+        const movePreview = this._moveItemPreview;
+        const bagGridEl = $('dungeon-bag-grid');
+        if (bagGridEl && previewBox && previewBody && typeof buildPreviewFromItem === 'function' && typeof movePreview === 'function') {
+            const slotCards = bagGridEl.querySelectorAll('.dungeon-bag-slot[data-bag-slot-index]');
+            slotCards.forEach(card => {
+                const idx = Number(card.getAttribute('data-bag-slot-index'));
+                const slot = bagSlots[idx];
+                if (!slot) return;
+                card.onmouseenter = (ev) => {
+                    const fakeItem = slot.type === 'consumable'
+                        ? { type: 'consumable', rarity: slot.rarity || 'rarity-common', name: `${slot.icon || ''} ${slot.name || 'Consumable'}`.trim(), subType: slot.subType, desc: slot.desc || '' }
+                        : { type: 'potion', rarity: slot.rarity || 'rarity-common', name: slot.name || 'Potion', subType: slot.subType, percent: slot.percent || 0 };
+                    buildPreviewFromItem(fakeItem);
+                    movePreview(ev);
+                    previewBox.classList.remove('hidden');
+                    previewBox.classList.add('visible');
+                };
+                card.onmousemove = (ev) => {
+                    if (previewBox.classList.contains('visible')) movePreview(ev);
+                };
+                card.onmouseleave = () => {
+                    previewBox.classList.remove('visible');
+                };
+            });
+        }
+        const keyCount = this.getDungeonKeyCount();
+        if ($('dungeon-status-text')) {
+            const baseStatus = dungeon.statusText || 'Choose a passage.';
+            $('dungeon-status-text').innerText = `${baseStatus} ${keyCount > 0 ? `🗝 Keys: ${keyCount}` : '🗝 Keys: 0'}`.trim();
+        }
         $('dungeon-loot-feed').innerHTML = recentLoot.length
             ? recentLoot.map(bundle => {
                 const header = bundle.nodeType === 'boss' ? 'Boss cache' : (bundle.nodeType === 'elite' ? 'Elite haul' : 'Chamber spoils');
@@ -368,6 +525,7 @@ const gameDungeon = {
         }
         if (!dungeon.completed) actions.push('<button class="btn" onclick="game.closeDungeonMenu()">ABANDON RUN</button>');
         $('dungeon-room-actions').innerHTML = actions.join('');
+        this.applyDungeonPanelState();
         wireButtonSfx($('screen-dungeon'));
     },
     moveToDungeonNode(nodeId) {
@@ -380,6 +538,7 @@ const gameDungeon = {
         this.currentDungeon.previousNodeId = currentNode.id;
         this.currentDungeon.currentNodeId = nodeId;
         targetNode.visited = true;
+        this.rollHiddenChestForNode(targetNode);
         this.currentDungeon.statusText = `You move into ${this.getDungeonMoveLabel(targetNode).toLowerCase()}.`;
         this.renderDungeonScreen();
     },
@@ -423,7 +582,9 @@ const gameDungeon = {
     },
     getDungeonConsumableDrop() {
         if (!Array.isArray(COMBAT_STORE_DEFS) || !COMBAT_STORE_DEFS.length) return null;
-        return COMBAT_STORE_DEFS[rng(0, COMBAT_STORE_DEFS.length - 1)];
+        const pool = COMBAT_STORE_DEFS.filter(def => def && def.subType !== 'dungeon_key');
+        const list = pool.length ? pool : COMBAT_STORE_DEFS;
+        return list[rng(0, list.length - 1)];
     },
     createDungeonLootBundle(node, encounter = null) {
         if (!this.player || !node) return null;
@@ -725,6 +886,12 @@ const gameDungeon = {
         if (!node || node.resolved || !this.currentDungeon || this._dungeonCombatPending) return;
         node.discovered = true;
         if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss') {
+            const chestResult = this.resolveHiddenChestInRoom(node);
+            if (chestResult) {
+                this.currentDungeon.statusText = chestResult.status;
+                const priorText = node.resultText ? `${node.resultText} ` : '';
+                node.resultText = `${priorText}${chestResult.text}`.trim();
+            }
             this._dungeonCombatPending = true;
             if (!node.encounter) node.encounter = this.createDungeonEncounterForNode(node, this.currentDungeon.depth || 1);
             if (node.encounter && !node.encounter.enemyGens) node.encounter.enemyGens = this.generateEncounterGens(node.encounter);
@@ -734,7 +901,8 @@ const gameDungeon = {
                     ? 'A harder shape steps out of the dark. This is no ordinary fight.'
                     : 'Movement breaks the silence. Something hostile lunges from the gloom.');
             this.currentDungeon.statusText = warningText;
-            node.resultText = warningText;
+            const chestPrefix = node.resultText ? `${node.resultText} ` : '';
+            node.resultText = `${chestPrefix}${warningText}`.trim();
             this.renderDungeonScreen();
             const dungeonScreen = $('screen-dungeon');
             setTimeout(() => {
@@ -745,6 +913,13 @@ const gameDungeon = {
             return;
         }
         this.resolveDungeonUtilityRoom(node);
+        const chestResult = this.resolveHiddenChestInRoom(node);
+        if (chestResult) {
+            const priorText = node.resultText ? `${node.resultText} ` : '';
+            node.resultText = `${priorText}${chestResult.text}`.trim();
+            this.currentDungeon.statusText = `${this.currentDungeon.statusText || ''} ${chestResult.status}`.trim();
+            this.renderDungeonScreen();
+        }
     },
     resolveCurrentDungeonCombatVictory() {
         const node = this.getCurrentDungeonNode();

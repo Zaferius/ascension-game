@@ -1103,8 +1103,8 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     display: flex;
     justify-content: space-between;
     gap: 16px;
-    align-items: baseline;
-    margin-bottom: 18px;
+    align-items: center;
+    margin-bottom: 0;
 }
 .dungeon-map-head h3,
 .dungeon-room-panel h3 {
@@ -1195,6 +1195,17 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     font-size: 0.92rem;
     text-transform: uppercase;
     letter-spacing: 0.14rem;
+}
+.dungeon-panel-toggle {
+    min-width: 96px;
+    font-size: 0.74rem;
+    letter-spacing: 0.08rem;
+}
+.dungeon-collapsible-body {
+    margin-top: 14px;
+}
+.dungeon-collapsible-body.hidden {
+    display: none;
 }
 .dungeon-loot-feed {
     display: grid;
@@ -1674,9 +1685,9 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 .hub-action-gamble { grid-column: 1; grid-row: 4; }
 .hub-action-shop-weapon { grid-column: 2; grid-row: 1; }
 .hub-action-shop-armor { grid-column: 2; grid-row: 2; }
-.hub-action-shop-magic { grid-column: 2; grid-row: 3; }
+.hub-action-shop-trinket { grid-column: 2; grid-row: 3; }
 .hub-action-shop-combat { grid-column: 2; grid-row: 4; }
-.hub-action-shop-potion { grid-column: 2; grid-row: 5; }
+.hub-action-shop-magic { grid-column: 2; grid-row: 5; }
 .hub-action-btn {
     min-height: 98px;
     margin: 0;
