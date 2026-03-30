@@ -664,3 +664,39 @@ If you need to understand the project fast, think of it like this:
 - `server.js` is a separate prototype PvP authority layer
 
 That mental model is enough to start making safe, incremental improvements.
+
+---
+
+## 22. Latest Magic System Update (Cooldown Edition)
+
+The magic feature recently moved to a cooldown-first combat model.
+
+### Core combat behavior
+
+- magic resource bar was removed from combat UI
+- spells are now governed by per-spell turn cooldowns
+- spell casting keeps high-impact combat feedback (shake/blur/hit-stop/toast flow)
+- opening the spell panel now hides the compact combat log to prevent overlap
+
+### Spell progression
+
+- spells are now tiered into ranks `I` through `V`
+- each tier has:
+  - stronger scaling/effect values
+  - tuned cooldown values
+  - level requirement gates
+  - higher shop prices
+- starter profile begins with only `Fireball I` unlocked
+
+### Magic shop behavior
+
+- `Magic Shop` now sells real spell tomes instead of placeholder text
+- each spell row shows tier and required level
+- purchase is blocked if player level is below requirement
+- hover preview now includes spell impact range (or utility note for non-damage spells)
+
+### Save compatibility
+
+- save migration now maps old unlock ids to the new tiered id scheme
+- invalid/obsolete spell ids are filtered on load
+- `Fireball I` is guaranteed as baseline unlock for migrated profiles

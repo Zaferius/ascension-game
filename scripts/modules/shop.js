@@ -654,19 +654,113 @@ const gameShop = {
         const cont = $('list-container');
         const titleEl = $('list-title');
         const headerExtra = $('list-header-extra');
+        game.ensurePreviewHelpers();
+        const previewBox = $('shop-preview');
+        const buildPreviewFromItem = game._buildItemPreview;
+        const movePreview = game._moveItemPreview;
+        const bindPreview = (el, item) => {
+            if (!el || !previewBox || typeof buildPreviewFromItem !== 'function' || typeof movePreview !== 'function') return;
+            el.onmouseenter = (ev) => {
+                buildPreviewFromItem(item);
+                movePreview(ev);
+                previewBox.classList.remove('hidden');
+                previewBox.classList.add('visible');
+            };
+            el.onmousemove = movePreview;
+            el.onmouseleave = () => {
+                previewBox.classList.remove('visible');
+            };
+        };
         if (!cont || !titleEl) return;
         const listPanel = document.querySelector('.list-panel');
         if (listPanel) listPanel.classList.remove('list-panel--inv');
         titleEl.innerText = 'MAGIC SHOP';
         const subtitleEl = $('list-title-sub');
-        if (subtitleEl) subtitleEl.innerText = 'Arcane spell market is under preparation. Spell inventory will be added next.';
-        if (headerExtra) headerExtra.innerHTML = '';
-        cont.innerHTML = `
-            <div style="text-align:center; padding:28px 20px; color:#a79ad8; border:1px solid rgba(129,98,187,0.45); background:rgba(34,22,52,0.38); border-radius:10px;">
-                <div style="font-size:1.35rem; margin-bottom:8px;">✨ MAGIC SHOP</div>
-                <div style="color:#c6baf0; font-size:0.92rem;">Arcane tomes are being cataloged. Spell entries will arrive in the next update.</div>
-            </div>
-        `;
+        if (subtitleEl) subtitleEl.innerText = 'Buy and upgrade spells. Higher tiers unlock at higher levels.';
+        if (headerExtra) {
+            headerExtra.innerHTML = `<div style="color:#9f8fc2; font-size:0.84rem;">Unlocked: <span class="text-purple">${(this.player.spellsUnlocked || []).length}</span> / ${(typeof SPELL_LIBRARY !== 'undefined' && Array.isArray(SPELL_LIBRARY)) ? SPELL_LIBRARY.length : 0}</div>`;
+        }
+
+        const spells = (typeof SPELL_LIBRARY !== 'undefined' && Array.isArray(SPELL_LIBRARY)) ? SPELL_LIBRARY : [];
+        if (spells.length === 0) {
+            cont.innerHTML = `<div style="text-align:center; padding:22px; color:#a79ad8;">No spells configured.</div>`;
+            return;
+        }
+
+        cont.innerHTML = '';
+        spells.forEach((spell) => {
+            const unlocked = Array.isArray(this.player.spellsUnlocked) && this.player.spellsUnlocked.includes(spell.id);
+            const price = this.getAdjustedBuyPrice({ price: spell.price || 120 });
+            const requiredLevel = spell.requiredLevel || 1;
+            const playerLevel = this.player.level || 1;
+            const levelOk = playerLevel >= requiredLevel;
+            const canBuy = !unlocked && levelOk && this.player.gold >= price;
+            const dmgRange = (typeof getSpellDisplayDamageRange === 'function')
+                ? getSpellDisplayDamageRange(spell, this.player.getEffectiveMag ? this.player.getEffectiveMag() : (this.player.stats?.mag || 1))
+                : { min: 0, max: 0 };
+            const dmgText = spell.type === 'cleanse'
+                ? 'Cleanse'
+                : (dmgRange.min === dmgRange.max ? `${dmgRange.min}` : `${dmgRange.min}-${dmgRange.max}`);
+            const row = document.createElement('div');
+            row.className = `item-row${unlocked ? ' combat-store-owned' : ''}`;
+            row.innerHTML = `
+                <div class="item-main-wrap">
+                    <div class="item-card-icon" style="font-size:1.6rem; display:flex; align-items:center; justify-content:center;">✨</div>
+                    <div class="item-main">
+                        <div class="item-main-name rarity-epic">${spell.name}</div>
+                        <div class="item-main-sub">${spell.description}</div>
+                    </div>
+                </div>
+                <div><span class="item-chip">Spell</span></div>
+                <div><span class="item-chip">${String(spell.roman || spell.rank || '').trim() || spell.type}</span></div>
+                <div class="item-level"><span class="item-chip">Lvl ${requiredLevel}</span></div>
+                <div class="item-price"><span class="text-gold">${unlocked ? '—' : price}</span></div>
+                <div class="item-action">
+                    ${unlocked
+                        ? '<span class="item-chip" style="color:#4caf50;">✓ Learned</span>'
+                        : `<button class="btn btn-buy" style="padding:5px 10px; font-size:0.8rem;" ${canBuy ? '' : 'disabled'}>${levelOk ? 'Learn' : 'Locked'}</button>`
+                    }
+                </div>
+            `;
+
+            if (!unlocked) {
+                const btn = row.querySelector('button');
+                if (btn && canBuy) {
+                    btn.onclick = () => {
+                        if (!this.player) return;
+                        if (!Array.isArray(this.player.spellsUnlocked)) this.player.spellsUnlocked = ['fireball_1'];
+                        if (this.player.spellsUnlocked.includes(spell.id)) return;
+                        if ((this.player.level || 1) < requiredLevel) return;
+                        const latestPrice = this.getAdjustedBuyPrice({ price: spell.price || 120 });
+                        if (this.player.gold < latestPrice) return;
+                        this.player.gold -= latestPrice;
+                        this.player.spellsUnlocked.push(spell.id);
+                        this.saveGame();
+                        this.updateHubUI();
+                        $('shop-gold').innerText = this.player.gold;
+                        this.renderMagicShop();
+                    };
+                }
+            }
+
+            bindPreview(row, {
+                type: 'weapon',
+                rarity: unlocked ? 'rarity-uncommon' : 'rarity-epic',
+                weaponClass: 'Spell Tome',
+                name: `${spell.name} Tome`,
+                min: Math.max(0, dmgRange.min),
+                max: Math.max(0, dmgRange.max),
+                desc: `${spell.description} Cooldown: ${spell.cooldown || 0} turns.`,
+                minLevel: requiredLevel,
+                statMods: { mag: Math.max(1, Math.floor((spell.rank || 1))) },
+                info: unlocked
+                    ? `Learned. ${spell.type === 'cleanse' ? 'Cleanses one DOT.' : `Expected impact: ${dmgText}`}`
+                    : `Unlocks at level ${requiredLevel}. ${spell.type === 'cleanse' ? 'Utility: cleanse effect.' : `Expected impact: ${dmgText}`}`,
+                infoColor: unlocked ? 'text-green' : (levelOk ? 'text-purple' : 'text-red')
+            });
+
+            cont.appendChild(row);
+        });
     },
     openPotionShop() {
         // Legacy entry point kept for compatibility; potions now live in Combat Store.

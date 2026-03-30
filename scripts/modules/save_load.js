@@ -92,6 +92,27 @@ const gameSaveLoad = {
         if (typeof this.player.skillPoints !== 'number') this.player.skillPoints = 0;
         if (typeof this.player.dungeonsCompleted !== 'number') this.player.dungeonsCompleted = 0;
         if (typeof this.player.deepestDungeonDepth !== 'number') this.player.deepestDungeonDepth = 0;
+        if (typeof this.player.maxMagic !== 'number') this.player.maxMagic = this.player.getMaxMagic();
+        if (typeof this.player.currentMagic !== 'number') this.player.currentMagic = this.player.maxMagic;
+        if (typeof this.player.magicRegen !== 'number') this.player.magicRegen = 1;
+        if (typeof this.player.spellPower !== 'number') this.player.spellPower = 0;
+        if (typeof this.player.magicResist !== 'number') this.player.magicResist = 0;
+        if (!Array.isArray(this.player.spellsUnlocked)) {
+            this.player.spellsUnlocked = ['fireball_1'];
+        }
+        if (!this.player.spellsUnlocked.includes('fireball_1')) {
+            if (this.player.spellsUnlocked.includes('fireball')) this.player.spellsUnlocked.push('fireball_1');
+            else this.player.spellsUnlocked.push('fireball_1');
+        }
+        if (typeof SPELL_LIBRARY !== 'undefined' && Array.isArray(SPELL_LIBRARY)) {
+            const validIds = new Set(SPELL_LIBRARY.map(s => s.id));
+            this.player.spellsUnlocked = this.player.spellsUnlocked
+                .map(id => id === 'fireball' ? 'fireball_1' : id)
+                .filter(id => validIds.has(id));
+            if (!this.player.spellsUnlocked.includes('fireball_1')) this.player.spellsUnlocked.unshift('fireball_1');
+        }
+        this.player.maxMagic = this.player.getMaxMagic();
+        this.player.currentMagic = Math.max(0, Math.min(this.player.maxMagic, this.player.currentMagic));
 
         // Migrate bag system — handle legacy saves (< v8) that had 3-slot potionSlots
         if (!this.player.bagCapacity || typeof this.player.bagCapacity !== 'number') {

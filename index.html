@@ -9,6 +9,7 @@
     <script src="scripts/config/status_effects.js"></script>
     <script src="scripts/config/audio.js"></script>
     <script src="scripts/config/potion_defs.js"></script>
+    <script src="scripts/config/spells.js"></script>
     <script src="scripts/config/combat_store_defs.js"></script>
     <script src="scripts/config/injuries.js"></script>
     <script src="scripts/config/tournaments.js"></script>
@@ -424,8 +425,10 @@
             <button id="btn-quick" class="c-btn c-btn-quick" onclick="combat.playerAttack('quick')"><div>QUICK</div><small id="hit-quick">95%</small></button>
             <button id="btn-normal" class="c-btn c-btn-normal" onclick="combat.playerAttack('normal')"><div>NORMAL</div><small id="hit-normal">80%</small></button>
             <button id="btn-power" class="c-btn c-btn-power" onclick="combat.playerAttack('power')"><div>POWER</div><small id="hit-power">50%</small></button>
+            <button id="btn-spells" class="c-btn c-btn-spell" onclick="combat.toggleSpellPanel()"><div>SPELLS</div><small id="spell-quick-info">Cast</small></button>
             <button class="c-btn c-btn-heal" onclick="combat.openBag()"><div>BAG</div><small>Items</small></button>
         </div>
+        <div id="combat-spell-panel" class="combat-spell-panel hidden"></div>
     </div>
 
     <!-- SHOP/INV -->

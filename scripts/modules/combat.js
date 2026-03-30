@@ -10,6 +10,7 @@ const combat = {
     enemies: [], activeEnemyIndex: 0,
     targetSelectionActive: false, pendingAttackType: null,
     hoverTargetIndex: null,
+    spellCooldowns: {},
     enemyActing: false, // guard to prevent overlapping enemy turns
     playerDots: [], // active DOT effects on player
     dotResist: {},  // per-combat resistance per DOT id (0-1)
@@ -49,7 +50,11 @@ const combat = {
             const pending = this.pendingAttackType;
             this.targetSelectionActive = false;
             this.pendingAttackType = null;
-            this.playerAttack(pending, index);
+            if (String(pending).startsWith('spell:')) {
+                this.castSpell(String(pending).slice(6), index);
+            } else {
+                this.playerAttack(pending, index);
+            }
         }
     },
     previewTarget(index = 0) {
@@ -90,6 +95,12 @@ const combat = {
             const show2 = this.mode === 'duo' && this.targetSelectionActive && !!(this.enemies[1] && this.enemies[1].hp > 0);
             btn2.classList.toggle('hidden', !show2);
             btn2.classList.toggle('is-active', show2 && ((this.hoverTargetIndex ?? this.activeEnemyIndex) === 1));
+        }
+        const targetPrompt = $('combat-target-prompt');
+        if (targetPrompt) {
+            const isSpell = this.pendingAttackType && String(this.pendingAttackType).startsWith('spell:');
+            targetPrompt.classList.toggle('hidden', !this.targetSelectionActive);
+            targetPrompt.innerText = isSpell ? 'CHOOSE SPELL TARGET' : 'CHOOSE ENEMY';
         }
     },
     buildEnemyCombatant(enemyGen, mode) {
@@ -217,6 +228,7 @@ const combat = {
         this.criticalHitsTaken = 0;
         this.playerHpDamageTaken = 0;
         this.lastEnemyName = '';
+        this.spellCooldowns = {};
 
         // Prepare combat potion slots for this fight.
         // Inventory reservation is handled when assigning slots in inventory.
@@ -317,6 +329,7 @@ const combat = {
         this.log = [];
         if (this.mode === 'duo' && this.enemies[1]) this.logMessage(`${this.enemies[0].name} and ${this.enemies[1].name} enter the arena!`);
         else this.logMessage(`${this.enemy.name} enters the arena!`);
+        this.renderSpellPanel();
         this.updateUI();
         // Yazı-tura: her arenada ilk saldıran taraf rastgele belirlensin, sonucu mor log ile göster
         const firstIsPlayer = Math.random() < 0.5;
@@ -636,6 +649,7 @@ const combat = {
     },
     openBag() {
         if (this.turn !== 'player' || this.actionLock) return;
+        this.closeSpellPanel();
         const modal = $('modal-bag');
         const list = $('bag-list');
         const countEl = $('bag-count');
@@ -914,7 +928,320 @@ const combat = {
                 $('hit-quick').innerText = '--'; $('hit-normal').innerText = '--'; $('hit-power').innerText = '--';
             }
         }
+        const spellBtn = $('btn-spells');
+        const spellInfo = $('spell-quick-info');
+        if (spellBtn) {
+            const available = this.getAvailableSpells();
+            const castable = available.some(s => this.canCastSpell(s));
+            spellBtn.disabled = !castable;
+            if (spellInfo) {
+                const ready = available.filter(s => this.canCastSpell(s)).length;
+                spellInfo.innerText = `${ready}/${available.length} ready`;
+            }
+        }
+        this.renderSpellPanel();
         this.updateEnemyTargetUI();
+    },
+    getAvailableSpells() {
+        const p = game.player;
+        const all = (typeof SPELL_LIBRARY !== 'undefined' && Array.isArray(SPELL_LIBRARY)) ? SPELL_LIBRARY : [];
+        const unlocked = Array.isArray(p && p.spellsUnlocked) ? p.spellsUnlocked : [];
+        return all.filter(spell => unlocked.includes(spell.id));
+    },
+    getSpellById(spellId) {
+        const all = (typeof SPELL_LIBRARY !== 'undefined' && Array.isArray(SPELL_LIBRARY)) ? SPELL_LIBRARY : [];
+        return all.find(s => s.id === spellId) || null;
+    },
+    getSpellCooldown(spellId) {
+        return Math.max(0, (this.spellCooldowns && this.spellCooldowns[spellId]) || 0);
+    },
+    canCastSpell(spell) {
+        if (!spell) return false;
+        if (this.turn !== 'player' || this.actionLock) return false;
+        if (this.getSpellCooldown(spell.id) > 0) return false;
+        return true;
+    },
+    toggleSpellPanel() {
+        const panel = $('combat-spell-panel');
+        if (!panel) return;
+        if (panel.classList.contains('hidden')) {
+            this.openSpellPanel();
+        } else {
+            this.closeSpellPanel();
+        }
+    },
+    openSpellPanel() {
+        if (this.turn !== 'player' || this.actionLock) return;
+        this.closeBag();
+        const panel = $('combat-spell-panel');
+        const log = $('combat-log');
+        if (!panel) return;
+        this.renderSpellPanel();
+        panel.classList.remove('hidden');
+        if (log) log.classList.add('hidden');
+    },
+    closeSpellPanel() {
+        const panel = $('combat-spell-panel');
+        const log = $('combat-log');
+        if (panel) panel.classList.add('hidden');
+        if (log) log.classList.remove('hidden');
+    },
+    renderSpellPanel() {
+        const panel = $('combat-spell-panel');
+        if (!panel) return;
+        const spells = this.getAvailableSpells();
+        if (spells.length === 0) {
+            panel.innerHTML = '<div class="combat-spell-empty">No spells unlocked.</div>';
+            return;
+        }
+        panel.innerHTML = spells.map(spell => {
+            const cd = this.getSpellCooldown(spell.id);
+            const canCast = this.canCastSpell(spell);
+            const reason = cd > 0 ? `CD ${cd}` : 'Ready';
+            return `
+                <button class="combat-spell-btn ${canCast ? '' : 'is-disabled'}" ${canCast ? '' : 'disabled'} onclick="combat.castSpell('${spell.id}')">
+                    <div class="combat-spell-head">
+                        <span class="combat-spell-name">${spell.name}</span>
+                        <span class="combat-spell-cost">CD ${spell.cooldown || 0}</span>
+                    </div>
+                    <div class="combat-spell-desc">${spell.description}</div>
+                    <div class="combat-spell-meta">${reason}</div>
+                </button>
+            `;
+        }).join('');
+    },
+    getSpellValue(spell, key, fallback = 0) {
+        return (spell && typeof spell[key] === 'number') ? spell[key] : fallback;
+    },
+    computeSpellDamage(spell, caster) {
+        const mag = caster.getEffectiveMag();
+        const base = this.getSpellValue(spell, 'basePower', 0);
+        const scaling = this.getSpellValue(spell, 'scaling', 2.0);
+        const raw = base + (mag * scaling) + (caster.getSpellPower() * 0.35);
+        return Math.max(1, Math.floor(raw));
+    },
+    computeSpellDotDamage(spell, caster) {
+        const dot = spell && spell.dot ? spell.dot : null;
+        if (!dot) return 0;
+        const mag = caster.getEffectiveMag();
+        const raw = (dot.damageBase || 1) + (mag * (dot.damageScale || 0.2));
+        return Math.max(1, Math.floor(raw));
+    },
+    getSpellProfile(type = 'damage') {
+        if (type === 'dot') {
+            return {
+                shake: 'shake-md',
+                blur: 'combat-blur-sm',
+                impactDuration: 360,
+                hitStopMs: 50,
+                particleColor: 'rgba(174,126,255,0.94)',
+                slashColor: 'rgba(224,198,255,0.9)',
+                impactSize: 250,
+                impactAnimMs: 260,
+                particleCount: 8,
+                slashCount: 2
+            };
+        }
+        if (type === 'shield' || type === 'cleanse') {
+            return {
+                shake: 'shake-sm',
+                blur: 'combat-blur-sm',
+                impactDuration: 280,
+                hitStopMs: 35,
+                particleColor: 'rgba(150,230,255,0.9)',
+                slashColor: 'rgba(220,245,255,0.86)',
+                impactSize: 200,
+                impactAnimMs: 220,
+                particleCount: 6,
+                slashCount: 1
+            };
+        }
+        return {
+            shake: 'shake-lg',
+            blur: 'combat-blur-lg',
+            impactDuration: 460,
+            hitStopMs: 82,
+            particleColor: 'rgba(198,144,255,0.98)',
+            slashColor: 'rgba(255,214,255,0.92)',
+            impactSize: 300,
+            impactAnimMs: 320,
+            particleCount: 10,
+            slashCount: 3
+        };
+    },
+    applySpellCooldownTick() {
+        if (!this.spellCooldowns) this.spellCooldowns = {};
+        Object.keys(this.spellCooldowns).forEach(id => {
+            const next = Math.max(0, (this.spellCooldowns[id] || 0) - 1);
+            this.spellCooldowns[id] = next;
+        });
+    },
+    async castSpell(spellId, targetIndex = null) {
+        if (this.turn !== 'player' || this.actionLock) return;
+        const spell = this.getSpellById(spellId);
+        if (!spell) return;
+        if (spell.targetType === 'enemy' && this.mode === 'duo' && targetIndex === null && this.getLivingEnemies().length > 1) {
+            this.pendingAttackType = `spell:${spell.id}`;
+            this.targetSelectionActive = true;
+            this.hoverTargetIndex = null;
+            this.updateEnemyTargetUI();
+            this.updateUI();
+            this.logMessage('Choose an enemy target for your spell.');
+            return;
+        }
+        if (this.getSpellCooldown(spell.id) > 0) {
+            this.logMessage(`${spell.name} is on cooldown.`);
+            return;
+        }
+
+        this.targetSelectionActive = false;
+        this.pendingAttackType = null;
+        this.hoverTargetIndex = null;
+        if (typeof targetIndex === 'number' && Array.isArray(this.enemies) && this.enemies[targetIndex] && this.enemies[targetIndex].hp > 0) {
+            this.activeEnemyIndex = targetIndex;
+            this.syncActiveEnemy();
+        }
+
+        this.actionLock = true;
+        this.closeSpellPanel();
+        const acts = $('combat-actions');
+        if (acts) {
+            acts.style.opacity = '0.8';
+            acts.style.pointerEvents = 'none';
+        }
+
+        try {
+            const p = game.player;
+
+            const spellProfile = this.getSpellProfile(spell.type);
+
+            if (spell.type === 'damage') {
+                const targetEnemy = this.syncActiveEnemy();
+                if (!targetEnemy || targetEnemy.hp <= 0) {
+                    this.logMessage('No valid target for spell.');
+                    this.updateUI();
+                    return;
+                }
+                const damage = this.computeSpellDamage(spell, p);
+                this.takeDamage(damage, 'enemy');
+                this.showDmg(damage, 'enemy', 'crit');
+                this.logMessage(`You cast ${spell.name} and deal <span class="log-dmg">${damage}</span> magic damage to ${targetEnemy.name}.`);
+                this.triggerHitImpact(spellProfile.shake, spellProfile.blur, spellProfile.impactDuration, {
+                    hitStopMs: spellProfile.hitStopMs,
+                    particleColor: spellProfile.particleColor,
+                    slashColor: spellProfile.slashColor,
+                    impactSize: spellProfile.impactSize,
+                    particleCount: spellProfile.particleCount,
+                    slashCount: spellProfile.slashCount,
+                    impactAnimMs: spellProfile.impactAnimMs,
+                    impactCore: 'rgba(220,190,255,0.96)',
+                    impactMid: 'rgba(130,56,210,0.9)',
+                    impactGlow: 'rgba(104,36,184,0.9)'
+                });
+                this.showCombatToast(`${spell.name}!`, 'status');
+                playSfx('armorHit');
+                if (spell.statusEffect && spell.statusEffect.id && Math.random() < (spell.statusEffect.chance || 0)) {
+                    const dotDamage = Math.max(1, Math.floor((spell.statusEffect.damageBase || 3) + (p.getEffectiveMag() * (spell.statusEffect.damageScale || 0.2))));
+                    this.applyDotToEnemy(this.activeEnemyIndex, spell.statusEffect.id, dotDamage, spell.statusEffect.duration || 2, spell.name);
+                    const cfg = (typeof STATUS_EFFECTS_CONFIG !== 'undefined' && STATUS_EFFECTS_CONFIG.effects[spell.statusEffect.id]) ? STATUS_EFFECTS_CONFIG.effects[spell.statusEffect.id] : null;
+                    const label = cfg ? cfg.label : spell.statusEffect.id;
+                    this.logMessage(`${spell.name} inflicts <span class="log-status">${label}</span>.`);
+                }
+            } else if (spell.type === 'dot') {
+                const targetEnemy = this.syncActiveEnemy();
+                if (!targetEnemy || targetEnemy.hp <= 0) {
+                    this.logMessage('No valid target for spell.');
+                    this.updateUI();
+                    return;
+                }
+                const dot = spell.dot || {};
+                const dotId = dot.id || (spell.statusEffect && spell.statusEffect.id) || 'poison';
+                const dotDamage = this.computeSpellDotDamage(spell, p);
+                const duration = dot.duration || 3;
+                this.applyDotToEnemy(this.activeEnemyIndex, dotId, dotDamage, duration, spell.name);
+                const cfg = (typeof STATUS_EFFECTS_CONFIG !== 'undefined' && STATUS_EFFECTS_CONFIG.effects[dotId]) ? STATUS_EFFECTS_CONFIG.effects[dotId] : null;
+                const label = cfg ? cfg.label : dotId;
+                this.logMessage(`You cast ${spell.name} and apply <span class="log-status">${label}</span> to ${targetEnemy.name}.`);
+                this.showCombatToast(`${spell.name} cast`, 'status', dotId);
+                this.triggerHitImpact(spellProfile.shake, spellProfile.blur, spellProfile.impactDuration, {
+                    hitStopMs: spellProfile.hitStopMs,
+                    particleColor: spellProfile.particleColor,
+                    slashColor: spellProfile.slashColor,
+                    impactSize: spellProfile.impactSize,
+                    particleCount: spellProfile.particleCount,
+                    slashCount: spellProfile.slashCount,
+                    impactAnimMs: spellProfile.impactAnimMs,
+                    impactCore: 'rgba(180,255,220,0.94)',
+                    impactMid: 'rgba(80,180,120,0.86)',
+                    impactGlow: 'rgba(52,145,91,0.8)'
+                });
+                this.showDmg(dotDamage, 'enemy', 'dot');
+                playSfx('armorHit');
+            } else if (spell.type === 'shield') {
+                if (this.maxArmor <= 0) {
+                    this.logMessage(`You cast ${spell.name}, but no armor can be restored in this battle.`);
+                } else {
+                    const gain = Math.max(1, Math.floor(this.getSpellValue(spell, 'basePower', 8) + (p.getEffectiveMag() * this.getSpellValue(spell, 'scaling', 1.4))));
+                    const before = this.armor;
+                    this.armor = Math.min(this.maxArmor, this.armor + gain);
+                    const actual = this.armor - before;
+                    this.logMessage(`You cast ${spell.name} and gain <span class="log-heal">${actual}</span> Armor.`);
+                    this.showDmg(actual, 'player', 'heal');
+                    this.triggerHitImpact(spellProfile.shake, spellProfile.blur, spellProfile.impactDuration, {
+                        hitStopMs: spellProfile.hitStopMs,
+                        particleColor: spellProfile.particleColor,
+                        slashColor: spellProfile.slashColor,
+                        impactSize: spellProfile.impactSize,
+                        particleCount: spellProfile.particleCount,
+                        slashCount: spellProfile.slashCount,
+                        impactAnimMs: spellProfile.impactAnimMs,
+                        impactCore: 'rgba(170,220,255,0.9)',
+                        impactMid: 'rgba(95,148,220,0.82)',
+                        impactGlow: 'rgba(60,104,173,0.75)'
+                    });
+                }
+            } else if (spell.type === 'cleanse') {
+                if (!this.playerDots || this.playerDots.length === 0) {
+                    this.logMessage(`You cast ${spell.name}, but no affliction is active.`);
+                } else {
+                    const removed = this.playerDots[0];
+                    this.playerDots = this.playerDots.filter((dot, idx) => idx !== 0);
+                    const cfg = (typeof STATUS_EFFECTS_CONFIG !== 'undefined' && STATUS_EFFECTS_CONFIG.effects[removed.id]) ? STATUS_EFFECTS_CONFIG.effects[removed.id] : null;
+                    const label = cfg ? cfg.label : removed.id;
+                    this.logMessage(`You cast ${spell.name} and cleanse <span class="log-status">${label}</span>.`);
+                    this.triggerHitImpact(spellProfile.shake, spellProfile.blur, spellProfile.impactDuration, {
+                        hitStopMs: spellProfile.hitStopMs,
+                        particleColor: spellProfile.particleColor,
+                        slashColor: spellProfile.slashColor,
+                        impactSize: spellProfile.impactSize,
+                        particleCount: spellProfile.particleCount,
+                        slashCount: spellProfile.slashCount,
+                        impactAnimMs: spellProfile.impactAnimMs,
+                        impactCore: 'rgba(215,255,238,0.9)',
+                        impactMid: 'rgba(126,211,180,0.78)',
+                        impactGlow: 'rgba(82,166,137,0.72)'
+                    });
+                }
+            }
+
+            if (spell.cooldown && spell.cooldown > 0) {
+                this.spellCooldowns[spell.id] = spell.cooldown;
+            }
+
+            this.updateUI();
+            if (this.getLivingEnemies().length === 0) {
+                this.win();
+            } else {
+                await wait(700);
+                this.setTurn('enemy');
+            }
+        } catch (err) {
+            console.error('castSpell error', err);
+            this.logMessage('Spell cast failed, flow recovered.');
+            this.updateUI();
+        } finally {
+            this.actionLock = false;
+        }
     },
     logMessage(msg) {
         if(!this.log) this.log = [];
@@ -1060,6 +1387,7 @@ const combat = {
         this.turn = who; const ind = $('turn-indicator'); const acts = $('combat-actions');
         if(who === 'player') {
             ind.innerText = "PLAYER TURN"; ind.className = "text-green";
+            this.applySpellCooldownTick();
             // Önce butonları kilitle, DOT ve regen çözülsün, sonra oyuncu hareket etsin
             acts.style.opacity = '0.5'; acts.style.pointerEvents = 'none';
 
@@ -1090,6 +1418,7 @@ const combat = {
             }, delay);
         } else {
             ind.innerText = "ENEMY TURN"; ind.className = "text-red"; acts.style.opacity = '0.5'; acts.style.pointerEvents = 'none';
+            this.closeSpellPanel();
 
             if (this.applyEnemyDotTicks()) return;
 

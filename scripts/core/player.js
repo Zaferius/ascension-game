@@ -18,8 +18,16 @@ class Player {
         this.dungeonsCompleted = 0;
         this.deepestDungeonDepth = 0;
         this.injuries = [];
+        this.maxMagic = 0;
+        this.currentMagic = 0;
+        this.magicRegen = 1;
+        this.spellPower = 0;
+        this.magicResist = 0;
+        this.spellsUnlocked = ['fireball_1'];
         this.bagCapacity = 8;
         this.bagSlots = new Array(8).fill(null);
+        this.maxMagic = this.getMaxMagic();
+        this.currentMagic = this.maxMagic;
     }
 
     // --- Skill helpers ---
@@ -119,6 +127,19 @@ class Player {
         const base = 2 + vit * 4 + (lvl - 1) * 6;
         const hp = Math.floor(base * this.getHpMultiplier());
         return Math.max(6, hp + this.getSkillEffect('hpFlat') - this.getInjuryPenalty('hpFlatPenalty'));
+    }
+    getMaxMagic() {
+        const mag = this.getEffectiveMag();
+        const lvl = this.level || 1;
+        const base = 22 + ((lvl - 1) * 2);
+        return Math.max(12, Math.floor(base + mag * 6));
+    }
+    getMagicRegen() {
+        const base = (typeof this.magicRegen === 'number') ? this.magicRegen : 1;
+        return Math.max(0, Math.floor(base + (this.getEffectiveMag() / 5)));
+    }
+    getSpellPower() {
+        return Math.max(0, (this.getEffectiveMag() * 2) + ((typeof this.spellPower === 'number') ? this.spellPower : 0));
     }
     getRegen() {
         return Math.max(0, Math.floor(this.getEffectiveVit() / 2) + this.getSkillEffect('regenFlat') - this.getInjuryPenalty('regenPenalty'));

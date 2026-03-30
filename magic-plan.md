@@ -12,23 +12,23 @@ Amaç:
 
 ## 1. Core Design Goals
 
-- [ ] Magic bar ekle
-- [ ] Oyuncunun mevcut ve maksimum magic değerlerini destekle
-- [ ] Yeterli magic yoksa büyü kullanımını engelle
-- [ ] Büyüleri mevcut combat seçeneklerinden biri haline getir
-- [ ] Mevcut normal/quick/power attack sistemini geçersiz kılma
-- [ ] Sistemi future-proof kur; ileride yeni büyüler kolay eklenebilsin
+- [x] Magic bar ekle
+- [x] Oyuncunun mevcut ve maksimum magic değerlerini destekle
+- [x] Yeterli magic yoksa büyü kullanımını engelle
+- [x] Büyüleri mevcut combat seçeneklerinden biri haline getir
+- [x] Mevcut normal/quick/power attack sistemini geçersiz kılma
+- [x] Sistemi future-proof kur; ileride yeni büyüler kolay eklenebilsin
 
 ---
 
 ## 2. High-Level Rules
 
-- [ ] Magic, ayrı bir combat kaynağı olacak
-- [ ] Her spell belirli bir magic cost tüketecek
-- [ ] Oyuncu yalnızca yeterli magic varsa spell cast edebilecek
-- [ ] Combat başlangıcında currentMagic değeri düzgün initialize edilmeli
-- [ ] Her tur küçük miktarda magic regen olup olmayacağı netleştirilmeli
-- [ ] Güçlü büyüler için cooldown sistemi gerekip gerekmediği kararlaştırılmalı
+- [x] Magic, ayrı bir combat kaynağı olacak
+- [x] Her spell belirli bir magic cost tüketecek
+- [x] Oyuncu yalnızca yeterli magic varsa spell cast edebilecek
+- [x] Combat başlangıcında currentMagic değeri düzgün initialize edilmeli
+- [x] Her tur küçük miktarda magic regen olup olmayacağı netleştirilmeli
+- [x] Güçlü büyüler için cooldown sistemi gerekip gerekmediği kararlaştırılmalı
 - [ ] Magic sistemi hem PvE hem PvP ile uyumlu olmalı
 
 ---
@@ -36,31 +36,31 @@ Amaç:
 ## 3. Data Model Planning
 
 ### Player / Character Data
-- [ ] Karakter datasınaki `magicka` yı kullan.
-- [ ] `maxMagic` alanı ekle
-- [ ] `currentMagic` alanı ekle
-- [ ] Gerekirse `magicRegen` alanı ekle
-- [ ] Gerekirse `spellPower` alanı ekle
-- [ ] Gerekirse `magicResist` alanı ekle
+- [x] Karakter datasınaki `magicka` yı kullan.
+- [x] `maxMagic` alanı ekle
+- [x] `currentMagic` alanı ekle
+- [x] Gerekirse `magicRegen` alanı ekle
+- [x] Gerekirse `spellPower` alanı ekle
+- [x] Gerekirse `magicResist` alanı ekle
 
 ### Combat Data
-- [ ] Combat state içinde `currentMagic` takibini destekle
-- [ ] Tur başında magic regen uygulanacaksa bunu combat loop'a ekle
-- [ ] Spell cooldown kullanılacaksa combat state'e cooldown alanları ekle
+- [x] Combat state içinde `currentMagic` takibini destekle
+- [x] Tur başında magic regen uygulanacaksa bunu combat loop'a ekle
+- [x] Spell cooldown kullanılacaksa combat state'e cooldown alanları ekle
 
 ### Spell Data
-- [ ] Spell verilerini merkezi bir data/config yapısında tut
+- [x] Spell verilerini merkezi bir data/config yapısında tut
 - [ ] Her spell için şu alanları belirle:
-  - [ ] `id`
-  - [ ] `name`
-  - [ ] `description`
-  - [ ] `magicCost`
-  - [ ] `type`
-  - [ ] `basePower`
-  - [ ] `statusEffect`
-  - [ ] `cooldown`
-  - [ ] `targetType`
-  - [ ] `unlockCondition` (gerekirse)
+  - [x] `id`
+  - [x] `name`
+  - [x] `description`
+  - [x] `magicCost`
+  - [x] `type`
+  - [x] `basePower`
+  - [x] `statusEffect`
+  - [x] `cooldown`
+  - [x] `targetType`
+  - [x] `unlockCondition` (gerekirse)
 
 ---
 
@@ -68,14 +68,14 @@ Amaç:
 
 Aşağıdaki formüller başlangıç önerisi olarak değerlendirilebilir:
 
-- [ ] `maxMagic = base + (magicStat * scale)`
-- [ ] `spellDamage = baseSpellPower + (magicStat * scale)`
-- [ ] `magicRegen = baseRegen + floor(magicStat / x)`
+- [x] `maxMagic = base + (magicStat * scale)`
+- [x] `spellDamage = baseSpellPower + (magicStat * scale)`
+- [x] `magicRegen = baseRegen + floor(magicStat / x)`
 
 Karar verilmesi gerekenler:
-- [ ] Başlangıç base magic kaç olacak?
-- [ ] Turn başına regen olacak mı?
-- [ ] Regen çok düşük mü olmalı?
+- [x] Başlangıç base magic kaç olacak?
+- [x] Turn başına regen olacak mı?
+- [x] Regen çok düşük mü olmalı?
 - [ ] PvP için ayrı denge gerekir mi?
 
 ---
@@ -84,10 +84,10 @@ Karar verilmesi gerekenler:
 
 İlk sistem için büyüler şu ana kategorilerle düşünülmeli:
 
-- [ ] Direct Damage Spells
-- [ ] DOT / Debuff Spells
-- [ ] Defensive Spells
-- [ ] Cleanse / Recovery Spells
+- [x] Direct Damage Spells
+- [x] DOT / Debuff Spells
+- [x] Defensive Spells
+- [x] Cleanse / Recovery Spells
 - [ ] Utility Spells
 
 Amaç:
@@ -102,37 +102,37 @@ Amaç:
 İlk sürüm için 4–6 spell yeterli.
 
 ### Önerilen başlangıç büyüleri
-- [ ] Fireball
-  - [ ] direct magic damage
-  - [ ] düşük burn chance veya sadece saf damage
-- [ ] Poison Cloud
-  - [ ] poison DOT uygular
-- [ ] Blood Hex
-  - [ ] bleed DOT uygular
-- [ ] Arcane Shield
-  - [ ] armor veya temporary shield verir
-- [ ] Cleanse
-  - [ ] oyuncudaki DOT etkilerinden birini veya belirli türleri kaldırır
-- [ ] Thunder Strike
-  - [ ] yüksek cost'lu burst spell
+- [x] Fireball
+  - [x] direct magic damage
+  - [x] düşük burn chance veya sadece saf damage
+- [x] Poison Cloud
+  - [x] poison DOT uygular
+- [x] Blood Hex
+  - [x] bleed DOT uygular
+- [x] Arcane Shield
+  - [x] armor veya temporary shield verir
+- [x] Cleanse
+  - [x] oyuncudaki DOT etkilerinden birini veya belirli türleri kaldırır
+- [x] Thunder Strike
+  - [x] yüksek cost'lu burst spell
 
 Her büyü için ayrıca karar ver:
-- [ ] düşük / orta / yüksek cost
-- [ ] cooldown gerekli mi
+- [x] düşük / orta / yüksek cost
+- [x] cooldown gerekli mi
 - [ ] resist edilebilir mi
-- [ ] direct damage mi status effect mi
-- [ ] tek hedef mi self-cast mi
+- [x] direct damage mi status effect mi
+- [x] tek hedef mi self-cast mi
 
 ---
 
 ## 7. UI / UX Tasks
 
 ### Combat UI
-- [ ] Combat ekranına Magic bar ekle
-- [ ] Magic değerini net ve okunabilir göster
-- [ ] Yetersiz magic varsa spell butonlarını disabled göster veya uyarı ver
-- [ ] Spell seçimi için basit ve temiz bir spell paneli oluştur
-- [ ] Spell açıklamalarını tooltip veya kısa text olarak göster
+- [x] Combat ekranına Magic bar ekle
+- [x] Magic değerini net ve okunabilir göster
+- [x] Yetersiz magic varsa spell butonlarını disabled göster veya uyarı ver
+- [x] Spell seçimi için basit ve temiz bir spell paneli oluştur
+- [x] Spell açıklamalarını tooltip veya kısa text olarak göster
 
 ### General UI
 - [ ] Character screen'de magic stat görünmeli mi karar ver
@@ -143,27 +143,27 @@ Her büyü için ayrıca karar ver:
 
 ## 8. Combat Flow Integration
 
-- [ ] Combat action listesine yeni bir `Cast Spell` seçeneği ekle
-- [ ] Spell seçilince available spell listesi aç
+- [x] Combat action listesine yeni bir `Cast Spell` seçeneği ekle
+- [x] Spell seçilince available spell listesi aç
 - [ ] Spell seçimi sonrası:
-  - [ ] yeterli magic kontrol et
-  - [ ] cooldown kontrol et
-  - [ ] target uygun mu kontrol et
-  - [ ] spell effect uygula
-  - [ ] magic düş
-  - [ ] combat log üret
-- [ ] Tur sonu akışını bozmadığından emin ol
-- [ ] Spell kullanımını mevcut attack/item sistemleriyle uyumlu hale getir
+  - [x] yeterli magic kontrol et
+  - [x] cooldown kontrol et
+  - [x] target uygun mu kontrol et
+  - [x] spell effect uygula
+  - [x] magic düş
+  - [x] combat log üret
+- [x] Tur sonu akışını bozmadığından emin ol
+- [x] Spell kullanımını mevcut attack/item sistemleriyle uyumlu hale getir
 
 ---
 
 ## 9. Status Effect Integration
 
-- [ ] Mevcut DOT sistemi ile büyüleri entegre et
-- [ ] Yeni paralel status sistemi oluşturma
-- [ ] Fire/Bleed/Poison gibi efektler zaten varsa doğrudan reuse et
-- [ ] Spell ile eklenen status effect'lerin mevcut processing loop içinde çalıştığını doğrula
-- [ ] Cleanse tarzı büyüler mevcut status temizleme yapısıyla uyumlu olmalı
+- [x] Mevcut DOT sistemi ile büyüleri entegre et
+- [x] Yeni paralel status sistemi oluşturma
+- [x] Fire/Bleed/Poison gibi efektler zaten varsa doğrudan reuse et
+- [x] Spell ile eklenen status effect'lerin mevcut processing loop içinde çalıştığını doğrula
+- [x] Cleanse tarzı büyüler mevcut status temizleme yapısıyla uyumlu olmalı
 
 ---
 
@@ -194,20 +194,20 @@ Karar verilmesi gereken konu:
 - [ ] V1'de cooldown olmadan sadece magic cost ile başlanacak mı?
 
 Öneri:
-- [ ] İlk sürümde önce yalnızca magic cost ile başla
-- [ ] Gerekirse sadece burst spell'lere cooldown ekle
+ - [ ] İlk sürümde önce yalnızca magic cost ile başla
+ - [x] Gerekirse sadece burst spell'lere cooldown ekle
 
 ---
 
 ## 12. Regen Decision
 
 Karar verilmesi gereken konu:
-- [ ] Combat sırasında turn başına magic regen olacak mı?
+- [x] Combat sırasında turn başına magic regen olacak mı?
 - [ ] Regen sadece bazı item/spell/gear ile mi olacak?
 - [ ] Hiç regen olmayıp sadece başlangıç magic ile mi gidilecek?
 
 Öneri:
-- [ ] Çok küçük turn-based regen ile başla
+- [x] Çok küçük turn-based regen ile başla
 - [ ] Böylece sistem hiç kilitlenmez ama spam de olmaz
 
 ---
@@ -222,8 +222,8 @@ Karar verilmesi gereken konu:
 - [ ] Büyü odaklı build yapılabilmesini destekleyen gear seçenekleri
 
 V1 için karar:
-- [ ] İlk sürümde equipment bonusları eklenmeyecekse sade bırak
-- [ ] Önce base system çalışsın
+- [x] İlk sürümde equipment bonusları eklenmeyecekse sade bırak
+- [x] Önce base system çalışsın
 - [ ] Sonra gear ile derinlik ekle
 
 ---
@@ -237,7 +237,7 @@ Karar verilmesi gerekenler:
 - [ ] Hepsi aynı anda mı açık olacak?
 
 V1 önerisi:
-- [ ] Test için ilk birkaç spell başlangıçta açık olabilir
+- [x] Test için ilk birkaç spell başlangıçta açık olabilir
 - [ ] Sonradan unlock/progression sistemi eklenir
 
 ---
@@ -251,20 +251,20 @@ V1 önerisi:
 - [ ] Spell slot sistemi build çeşitliliği sağlar
 
 V1 için:
-- [ ] Şimdilik slot sistemi olmadan başlanabilir
+- [x] Şimdilik slot sistemi olmadan başlanabilir
 - [ ] Sonra spell loadout sistemi eklenebilir
 
 ---
 
 ## 16. Combat Log / Feedback Tasks
 
-- [ ] Her spell için net combat log mesajları yaz
-- [ ] Damage büyülerinde hasar miktarını göster
-- [ ] Status effect uygulandıysa belirt
+- [x] Her spell için net combat log mesajları yaz
+- [x] Damage büyülerinde hasar miktarını göster
+- [x] Status effect uygulandıysa belirt
 - [ ] Resist olduysa belirt
-- [ ] Yetersiz magic varsa net mesaj ver
-- [ ] Cooldown varsa net mesaj ver
-- [ ] Shield/cleanse etkileri anlaşılır olsun
+- [x] Yetersiz magic varsa net mesaj ver
+- [x] Cooldown varsa net mesaj ver
+- [x] Shield/cleanse etkileri anlaşılır olsun
 
 Örnek mesajlar:
 - [ ] "You cast Fireball and dealt 18 magic damage."
@@ -282,7 +282,7 @@ Karar ver:
 - [ ] Bazı enemy tipleri de spell kullanacak mı?
 
 Öneri:
-- [ ] V1'de önce sadece player spells
+- [x] V1'de önce sadece player spells
 - [ ] Sistem stabil olunca magic enemy'ler eklenir
 
 ---
@@ -311,7 +311,7 @@ Magic sistemi dungeon crawling ile iyi çalışmalı.
   - [ ] route advantage
 
 V1 için:
-- [ ] Önce combat magic sistemi tamamlanmalı
+- [x] Önce combat magic sistemi tamamlanmalı
 - [ ] Sonra dungeon utility spell fikirleri eklenmeli
 
 ---
@@ -319,28 +319,28 @@ V1 için:
 ## 20. Implementation Order
 
 ### Faz 1 — Foundations
-- [ ] Magic stat/data modelini ekle
-- [ ] Max/current magic hesaplarını kur
-- [ ] Combat state'e current magic desteği ekle
+- [x] Magic stat/data modelini ekle
+- [x] Max/current magic hesaplarını kur
+- [x] Combat state'e current magic desteği ekle
 
 ### Faz 2 — UI
-- [ ] Magic bar ekle
-- [ ] Spell menüsü ekle
-- [ ] Basic feedback mesajları ekle
+- [x] Magic bar ekle
+- [x] Spell menüsü ekle
+- [x] Basic feedback mesajları ekle
 
 ### Faz 3 — Core Spell System
-- [ ] Spell config/data yapısını oluştur
-- [ ] Spell cast action sistemini kur
-- [ ] Magic cost düşümü ekle
-- [ ] Combat log entegrasyonu yap
+- [x] Spell config/data yapısını oluştur
+- [x] Spell cast action sistemini kur
+- [x] Magic cost düşümü ekle
+- [x] Combat log entegrasyonu yap
 
 ### Faz 4 — V1 Spells
-- [ ] Fireball
-- [ ] Poison Cloud
-- [ ] Blood Hex
-- [ ] Arcane Shield
-- [ ] Cleanse
-- [ ] Thunder Strike
+- [x] Fireball
+- [x] Poison Cloud
+- [x] Blood Hex
+- [x] Arcane Shield
+- [x] Cleanse
+- [x] Thunder Strike
 
 ### Faz 5 — Tuning
 - [ ] cost balance
@@ -360,11 +360,11 @@ V1 için:
 
 ## 21. Technical Cleanliness Checklist
 
-- [ ] Spell logic tek yerde toplanmalı
+- [x] Spell logic tek yerde toplanmalı
 - [ ] Hardcode if/else zincirlerinden kaçınılmalı
 - [ ] Spell effect resolution mümkün olduğunca data-driven olmalı
-- [ ] Combat code içinde büyü desteği modüler olmalı
-- [ ] UI ve combat logic birbirine çok sıkı bağlanmamalı
+- [x] Combat code içinde büyü desteği modüler olmalı
+- [x] UI ve combat logic birbirine çok sıkı bağlanmamalı
 - [ ] İleride yeni spell eklemek için tek dosyada config genişletmek yeterli olmalı
 
 ---
@@ -373,16 +373,16 @@ V1 için:
 
 Bir sistemin "çalışıyor" sayılması için minimum gereklilikler:
 
-- [ ] Magic bar görünür
-- [ ] Oyuncunun current/max magic değeri var
-- [ ] En az 3 spell kullanılabiliyor
-- [ ] Spell cast etmek magic harcıyor
-- [ ] Yetersiz magic engelleniyor
-- [ ] En az 1 damage spell çalışıyor
-- [ ] En az 1 DOT spell çalışıyor
-- [ ] En az 1 defensive/cleanse spell çalışıyor
-- [ ] Combat log düzgün bilgi veriyor
-- [ ] Mevcut attack sistemi bozulmuyor
+- [x] Magic bar görünür
+- [x] Oyuncunun current/max magic değeri var
+- [x] En az 3 spell kullanılabiliyor
+- [x] Spell cast etmek magic harcıyor
+- [x] Yetersiz magic engelleniyor
+- [x] En az 1 damage spell çalışıyor
+- [x] En az 1 DOT spell çalışıyor
+- [x] En az 1 defensive/cleanse spell çalışıyor
+- [x] Combat log düzgün bilgi veriyor
+- [x] Mevcut attack sistemi bozulmuyor
 
 ---
 

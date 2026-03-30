@@ -6,6 +6,7 @@
 
 -Achivements.
 
+-combat animasyonları.
 
 -Custom silah tasarlama ve üretme mekaniği? PLANLA
 
@@ -13,7 +14,7 @@
 -----------------
 MAGIC
 -Bazı büyüleri satın alabilmek için oyunda "Scroll" bulmak gerekecek para ve level ile satın alınamayacak öyle şak diye.
-
+-DEFENCE statı magic resistans'ı arttırsın.
 
 ##DUNGEONS
 -Dungeonlarda dinamik efektler(oda gecislerinde blur shake falan filan. canlı hissettirsin.)
