@@ -7,8 +7,20 @@ const AUDIO_LEVELS = {
 };
 
 const SFX_MAP = {
-    hpHit: "assets/sfx/meat-impact.wav",
-    armorHit: "assets/sfx/hit-metal.wav",
+    hpHit: [
+        "assets/sfx/combat/flesh_hit1.wav",
+        "assets/sfx/combat/flesh_hit2.wav",
+        "assets/sfx/combat/flesh_hit3.wav",
+        "assets/sfx/combat/flesh_hit4.wav",
+        "assets/sfx/combat/flesh_hit5.wav"
+    ],
+    armorHit: [
+        "assets/sfx/combat/flesh_hit1.wav",
+        "assets/sfx/combat/flesh_hit2.wav",
+        "assets/sfx/combat/flesh_hit3.wav",
+        "assets/sfx/combat/flesh_hit4.wav",
+    ],
+    armorHitMetal: "assets/sfx/combat/hit-metal.wav",
     dodge: "assets/sfx/dash.wav",
 };
 
@@ -25,7 +37,22 @@ const getMusicVolume = () => {
 };
 
 function playSfx(key) {
-    const src = SFX_MAP[key];
+    const entry = SFX_MAP[key];
+    if (!entry) return;
+
+    let src = entry;
+    if (Array.isArray(entry)) {
+        if (entry.length === 0) return;
+        if (!playSfx._lastIndexByKey) playSfx._lastIndexByKey = {};
+        const lastIndex = playSfx._lastIndexByKey[key];
+        let nextIndex = Math.floor(Math.random() * entry.length);
+        if (entry.length > 1 && nextIndex === lastIndex) {
+            nextIndex = (nextIndex + 1 + Math.floor(Math.random() * (entry.length - 1))) % entry.length;
+        }
+        playSfx._lastIndexByKey[key] = nextIndex;
+        src = entry[nextIndex];
+    }
+
     if (!src) return;
     try {
         const a = new Audio(src);

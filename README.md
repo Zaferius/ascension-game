@@ -578,6 +578,14 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 - a new placeholder `Magic Shop` entry now sits below `Combat Store`
 - `Iron City Tournament` now appears above `The Pit`
 
+### Combat presentation polish
+
+- combat now plays a center-screen slash/twirl VFX during attack exchanges using sprite frames from `assets/vfx/twirl/`
+- twirl VFX is one-shot per strike, tuned faster, enlarged, and mirrored for enemy-side attacks
+- twirl VFX now exits with a short fade-out for cleaner readability
+- enemy info stacks (name/level + armor/health bars) were repositioned to align with the enemy portrait block
+- player portrait in combat is currently hidden to keep the lower-left HUD cleaner while preserving player bars/name panel
+
 ### Inventory bag UI
 
 - the inventory `BAG` sidebar was redesigned to support high-capacity bags more cleanly

@@ -565,9 +565,19 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     filter: saturate(1.18) contrast(1.06);
 }
 .combat-unit { position: absolute; width: 340px; }
-.enemy-unit { top: 48px; right: 62px; text-align: right; width: 376px; z-index: 30; }
-.enemy-unit-2 { top: 334px; right: 62px; text-align: right; width: 376px; z-index: 30; }
-.player-unit { bottom: 148px; left: 54px; width: 360px; }
+.enemy-unit { top: 78px; right: 238px; text-align: right; width: 392px; z-index: 30; }
+.enemy-unit-2 { top: 364px; right: 238px; text-align: right; width: 392px; z-index: 30; }
+.player-unit { bottom: 148px; left: 54px; width: 360px; display: flex; flex-direction: column; }
+.player-unit .bar-group { order: 2; margin-top: 2px; }
+#c-player-name {
+    order: 1;
+    margin-top: 0 !important;
+    margin-bottom: 0;
+    font-size: 1.4rem !important;
+}
+#c-player-lvl {
+    font-size: 1rem !important;
+}
 /* Combat avatars (player/enemy portraits) */
 .combat-avatar {
     position:absolute;
@@ -658,15 +668,14 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 }
 /* Player portrait: above player HP/armor bars on the left */
 .combat-avatar-player {
-    left:50px;
-    bottom:320px;
+    display: none;
 }
-/* Enemy portrait: below enemy HP/armor bars on the right */
+/* Enemy portrait: right side of enemy HP/armor bars */
 .combat-avatar-enemy {
     right: 58px;
-    top: 182px;
+    top: 48px;
 }
-.combat-avatar-enemy-2 { top: 464px; right: 58px; }
+.combat-avatar-enemy-2 { top: 334px; right: 58px; }
 .combat-avatar.is-targeted,
 .combat-unit.is-targeted {
     box-shadow: none;
@@ -993,6 +1002,50 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     pointer-events: none;
 }
 .combat-impact-particles { z-index: 92; overflow: hidden; }
+.combat-twirl-vfx {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 550px;
+    height: 550x;
+    object-fit: contain;
+    transform: translate(-50%, -50%) scale(0.72);
+    transform-origin: center;
+    opacity: 0;
+    z-index: 95;
+    pointer-events: none;
+    filter: drop-shadow(0 0 16px rgba(255, 190, 110, 0.6));
+    transition: opacity 90ms ease-out, transform 120ms ease-out;
+}
+.combat-twirl-vfx.is-active {
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(1.12);
+    animation: twirlPulse 260ms ease-out 1;
+}
+.combat-twirl-vfx.is-fading {
+    opacity: 0;
+    animation: none;
+}
+.combat-twirl-vfx.is-mirrored {
+    transform: translate(-50%, -50%) scale(-0.72, 0.72);
+}
+.combat-twirl-vfx.is-mirrored.is-active {
+    transform: translate(-50%, -50%) scale(-1.12, 1.12);
+    animation: twirlPulseMirror 260ms ease-out 1;
+}
+.combat-twirl-vfx.is-mirrored.is-fading {
+    transform: translate(-50%, -50%) scale(-1.12, 1.12);
+}
+@keyframes twirlPulse {
+    0% { transform: translate(-50%, -50%) scale(0.82); filter: drop-shadow(0 0 10px rgba(255, 190, 110, 0.5)); }
+    70% { transform: translate(-50%, -50%) scale(1.2); filter: drop-shadow(0 0 30px rgba(255, 225, 165, 0.9)); }
+    100% { transform: translate(-50%, -50%) scale(1.12); filter: drop-shadow(0 0 18px rgba(255, 190, 110, 0.65)); }
+}
+@keyframes twirlPulseMirror {
+    0% { transform: translate(-50%, -50%) scale(-0.82, 0.82); filter: drop-shadow(0 0 10px rgba(255, 190, 110, 0.5)); }
+    70% { transform: translate(-50%, -50%) scale(-1.2, 1.2); filter: drop-shadow(0 0 30px rgba(255, 225, 165, 0.9)); }
+    100% { transform: translate(-50%, -50%) scale(-1.12, 1.12); filter: drop-shadow(0 0 18px rgba(255, 190, 110, 0.65)); }
+}
 .impact-particle {
     position: absolute;
     width: 12px;

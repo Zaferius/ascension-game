@@ -16,6 +16,15 @@ const combat = {
     dotResist: {},  // per-combat resistance per DOT id (0-1)
     log: [],        // recent combat log lines
     bagSlots: [null, null, null], // active potions brought into this fight
+    twirlFrames: [
+        'assets/vfx/twirl/twirl_01.png',
+        'assets/vfx/twirl/twirl_02.png',
+        'assets/vfx/twirl/twirl_03.png'
+    ],
+    twirlInterval: null,
+    twirlTimeout: null,
+    twirlCleanupTimeout: null,
+    twirlFrameIndex: 0,
     _lagTimers: {},
     _lastBarPct: {},
     mode: 'duel',
@@ -257,6 +266,7 @@ const combat = {
         }
         const particlesEl = $('combat-impact-particles');
         if (particlesEl) particlesEl.innerHTML = '';
+        this.stopTwirlVfx();
         const finisherEl = $('combat-finish-flash');
         if (finisherEl) finisherEl.className = 'combat-finish-flash';
         const playerFxEl = $('c-player-avatar-fx');
@@ -1583,7 +1593,10 @@ const combat = {
             this.hp -= hpDmg; if(this.hp < 0) this.hp = 0;
             this.playerHpDamageTaken += hpDmg;
             this.injuryRisk += hpDmg + Math.floor(armorDmg * 0.25);
-            if(armorDmg > 0) playSfx('armorHit');
+            if(armorDmg > 0) {
+                playSfx('armorHit');
+                playSfx('armorHitMetal');
+            }
             if(hpDmg > 0) {
                 this.flashBlood();
                 playSfx('hpHit');
@@ -1606,7 +1619,10 @@ const combat = {
             const hpDmg = rem;
             e.hp -= hpDmg;
             if (e.hp < 0) e.hp = 0;
-            if(armorDmg > 0) playSfx('armorHit');
+            if(armorDmg > 0) {
+                playSfx('armorHit');
+                playSfx('armorHitMetal');
+            }
             if(hpDmg > 0) playSfx('hpHit');
         }
     },
@@ -1649,12 +1665,14 @@ const combat = {
     getImpactPoint() {
         const container = $('game-container');
         const playerWrap = document.querySelector('.combat-avatar-player');
+        const playerUnit = document.querySelector('.player-unit');
         const enemyWrap = this.activeEnemyIndex === 1 ? $('combat-avatar-enemy-2') : document.querySelector('.combat-avatar-enemy:not(.combat-avatar-enemy-2)');
-        if (!container || !playerWrap || !enemyWrap) {
+        const playerAnchor = (playerWrap && getComputedStyle(playerWrap).display !== 'none') ? playerWrap : playerUnit;
+        if (!container || !playerAnchor || !enemyWrap) {
             return { x: 640, y: 360 };
         }
         const contRect = container.getBoundingClientRect();
-        const pRect = playerWrap.getBoundingClientRect();
+        const pRect = playerAnchor.getBoundingClientRect();
         const eRect = enemyWrap.getBoundingClientRect();
         const x = ((pRect.left + pRect.width / 2) + (eRect.left + eRect.width / 2)) / 2 - contRect.left;
         const y = ((pRect.top + pRect.height / 2) + (eRect.top + eRect.height / 2)) / 2 - contRect.top;
@@ -1751,7 +1769,81 @@ const combat = {
             if (toast.parentNode) toast.parentNode.removeChild(toast);
         }, 1400);
     },
+    ensureTwirlVfxElement() {
+        const host = $('screen-combat');
+        if (!host) return null;
+        let el = $('combat-twirl-vfx');
+        if (!el) {
+            el = document.createElement('img');
+            el.id = 'combat-twirl-vfx';
+            el.className = 'combat-twirl-vfx';
+            el.alt = 'attack twirl effect';
+            host.appendChild(el);
+        }
+        return el;
+    },
+    stopTwirlVfx() {
+        if (this.twirlInterval) {
+            clearInterval(this.twirlInterval);
+            this.twirlInterval = null;
+        }
+        if (this.twirlTimeout) {
+            clearTimeout(this.twirlTimeout);
+            this.twirlTimeout = null;
+        }
+        if (this.twirlCleanupTimeout) {
+            clearTimeout(this.twirlCleanupTimeout);
+            this.twirlCleanupTimeout = null;
+        }
+        const twirlEl = $('combat-twirl-vfx');
+        if (twirlEl) {
+            // Keep active transform during fade to prevent mirrored end-frame snap.
+            twirlEl.classList.add('is-active');
+            twirlEl.classList.add('is-fading');
+            this.twirlCleanupTimeout = setTimeout(() => {
+                const node = $('combat-twirl-vfx');
+                if (!node) return;
+                node.classList.remove('is-active');
+                node.classList.remove('is-fading');
+                node.classList.remove('is-mirrored');
+                this.twirlCleanupTimeout = null;
+            }, 180);
+        }
+        this.twirlFrameIndex = 0;
+    },
+    playTwirlVfx(duration = 180, frameMs = 34, opts = {}) {
+        const twirlEl = this.ensureTwirlVfxElement();
+        if (!twirlEl || !Array.isArray(this.twirlFrames) || this.twirlFrames.length === 0) return;
+
+        this.stopTwirlVfx();
+        const mirror = !!(opts && opts.mirror);
+        twirlEl.classList.toggle('is-mirrored', mirror);
+        twirlEl.classList.remove('is-active');
+        twirlEl.classList.remove('is-fading');
+        this.twirlFrameIndex = 0;
+        twirlEl.src = this.twirlFrames[0];
+        twirlEl.classList.add('is-active');
+
+        const frameDuration = Math.max(24, frameMs);
+        const frameCount = this.twirlFrames.length;
+        this.twirlInterval = setInterval(() => {
+            this.twirlFrameIndex += 1;
+            if (this.twirlFrameIndex >= frameCount) {
+                clearInterval(this.twirlInterval);
+                this.twirlInterval = null;
+                return;
+            }
+            twirlEl.src = this.twirlFrames[this.twirlFrameIndex];
+        }, frameDuration);
+
+        const singleCycleMs = frameDuration * Math.max(1, frameCount - 1);
+        this.twirlTimeout = setTimeout(() => {
+            this.stopTwirlVfx();
+        }, Math.max(singleCycleMs + 40, duration));
+    },
     async playCollisionAnimation(type, result) {
+        playSfx('dodge');
+        this.playTwirlVfx(180, 32, { mirror: type === 'enemy' });
         await wait(120);
         if (result && typeof result.apply === 'function') {
             result.apply();
@@ -1759,6 +1851,7 @@ const combat = {
     },
     async playDodgeAnimation(attacker, result) {
         playSfx('dodge');
+        this.playTwirlVfx(160, 30, { mirror: attacker === 'enemy' });
         await wait(100);
         if (result && typeof result.apply === 'function') {
             result.apply();

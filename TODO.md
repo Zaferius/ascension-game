@@ -7,6 +7,7 @@
 -Achivements.
 
 -combat animasyonları.
+-STUN CHANCE
 
 -Custom silah tasarlama ve üretme mekaniği? PLANLA
 
