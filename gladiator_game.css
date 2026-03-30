@@ -67,8 +67,8 @@ body {
 
 /* --- CONTAINER --- */
 #game-container {
-    width: min(1760px, calc(100vw - 24px));
-    height: min(1040px, calc(100vh - 24px));
+    width: min(1800px, calc(100vw - 24px));
+    height: min(860px, calc(100vh - 24px));
     background:
         linear-gradient(180deg, rgba(236, 1, 35, 0.04) 0%, rgba(236, 1, 35, 0) 14%),
         linear-gradient(135deg, #1a1a1d 0%, #101013 42%, #09090b 100%);
@@ -1848,9 +1848,9 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 }
 .hub-tournament-banner.hidden { display: none; }
 .hub-currency-card { padding: 10px 14px; border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(18,18,21,0.92) 100%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.18); }
-.hub-content { display: flex; width: 100%; height: 100%; }
+.hub-content { display: flex; width: 100%; height: 100%; min-height: 0; }
 .hub-sidebar { width: 34%; padding: 18px 18px 22px; background: linear-gradient(180deg, rgba(34, 34, 38, 0.34) 0%, rgba(13, 13, 16, 0.9) 100%); border-right: 1px solid rgba(255,255,255,0.08); overflow-y: auto; }
-.hub-main { width: 66%; padding: 22px 26px 28px; display: flex; flex-direction: column; }
+.hub-main { width: 66%; padding: 10px 16px 8px; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .hub-sheet-block { padding: 14px 16px 10px; border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(16,16,19,0.9) 100%); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 20px rgba(0,0,0,0.18); margin-bottom: 16px; }
 .hub-sheet-block-equip { margin-bottom: 0; }
 .hub-sidebar-actions {
@@ -1863,18 +1863,19 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 }
 .hub-panel-title { border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 7px; margin-bottom: 15px; letter-spacing: 0.04rem; }
 .hub-panel-title-centered { text-align: center; font-size: 1.15rem; letter-spacing: 0.08rem; }
-.hub-main-shell { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 18px; }
-.hub-hero-card { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; padding: 18px 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(58,17,24,0.12) 100%); box-shadow: 0 10px 24px rgba(0,0,0,0.22); }
+.hub-main-shell { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding-right: 4px; min-height: 0; }
+.hub-hero-card { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(58,17,24,0.12) 100%); box-shadow: 0 10px 24px rgba(0,0,0,0.22); }
 .hub-kicker { color: #8f8f97; font-size: 0.8rem; letter-spacing: 0.14rem; text-transform: uppercase; margin-bottom: 4px; }
-.hub-city-title { margin: 0; font-size: 2.35rem; letter-spacing: 0.08rem; }
-.hub-city-copy { margin: 8px 0 0 0; color: #9f9fa8; max-width: 540px; font-size: 0.95rem; line-height: 1.45; }
+.hub-city-title { margin: 0; font-size: 2.05rem; letter-spacing: 0.07rem; }
+.hub-city-copy { margin: 6px 0 0 0; color: #9f9fa8; max-width: 540px; font-size: 0.86rem; line-height: 1.28; }
 .hub-msg { min-width: 220px; text-align: right; color: #cb4156; font-size: 0.92rem; line-height: 1.35; }
 .hub-actions-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-    gap: 16px;
+    gap: 6px;
     flex: 1;
     align-content: start;
+    min-height: 0;
 }
 .hub-action-tournament-card { grid-column: 1; grid-row: 1; }
 .hub-action-pit { grid-column: 1; grid-row: 2; }
@@ -1886,7 +1887,7 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
 .hub-action-shop-combat { grid-column: 2; grid-row: 4; }
 .hub-action-shop-magic { grid-column: 2; grid-row: 5; }
 .hub-action-btn {
-    min-height: 98px;
+    min-height: 66px;
     margin: 0;
     padding: 0;
     text-align: left;
@@ -1902,26 +1903,26 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     box-shadow: 0 8px 0 #070708, 0 12px 28px rgba(0,0,0,0.22);
 }
 .hub-action-btn:hover:not(:disabled) { background: #2b2b30; }
-.hub-action-feature { min-height: 112px; }
+.hub-action-feature { min-height: 76px; }
 .hub-action-feature.btn-primary { background: #252529; }
 .hub-action-feature.btn-primary:hover:not(:disabled) { background: #2d2d33; }
 .hub-action-content {
     flex: 1;
     min-width: 0;
-    padding: 18px 22px;
+    padding: 10px 14px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 8px;
+    gap: 4px;
 }
 .hub-action-icon {
     position: relative;
-    width: 102px;
-    min-width: 102px;
+    width: 86px;
+    min-width: 86px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.45rem;
+    font-size: 1.9rem;
     line-height: 1;
     color: #f1f1f4;
     background: #2d2d31;
@@ -1929,8 +1930,8 @@ input:focus, select:focus { border-color: rgba(255,255,255,0.16) !important; box
     clip-path: polygon(28% 0, 100% 0, 100% 100%, 0 100%);
 }
 .hub-action-gamble .hub-action-icon { color: #efe7ff; }
-.hub-action-title { font-size: 1.28rem; line-height: 1.02; }
-.hub-action-sub { font-size: 0.9rem; line-height: 1.38; color: #afafb8; text-transform: none; letter-spacing: 0.01rem; }
+.hub-action-title { font-size: 1.08rem; line-height: 1.02; }
+.hub-action-sub { font-size: 0.78rem; line-height: 1.2; color: #afafb8; text-transform: none; letter-spacing: 0.01rem; }
 .hub-action-tournament {
     border-color: rgba(255,255,255,0.12);
 }
