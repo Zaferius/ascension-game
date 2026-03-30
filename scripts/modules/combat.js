@@ -1133,7 +1133,7 @@ const combat = {
                     return;
                 }
                 const damage = this.computeSpellDamage(spell, p);
-                this.takeDamage(damage, 'enemy');
+                this.takeDamage(damage, 'enemy', 'spell');
                 this.showDmg(damage, 'enemy', 'crit');
                 this.logMessage(`You cast ${spell.name} and deal <span class="log-dmg">${damage}</span> magic damage to ${targetEnemy.name}.`);
                 this.triggerHitImpact(spellProfile.shake, spellProfile.blur, spellProfile.impactDuration, {
@@ -1337,6 +1337,12 @@ const combat = {
             return { hitBonus: -10, damageMult: 1.35, shake: 'shake-lg', blur: 'combat-blur-lg', impactDuration: 500, hitStopMs: 90, particleColor: 'rgba(255,138,101,0.95)', slashColor: 'rgba(255,214,140,0.95)', impactSize: 300 };
         }
         return { hitBonus: 0, damageMult: 1, shake: 'shake-md', blur: 'combat-blur-md', impactDuration: 380, hitStopMs: 58, particleColor: 'rgba(255,236,179,0.95)', slashColor: 'rgba(255,255,255,0.9)', impactSize: 230 };
+    },
+    getEnemyHitShakeScale(kind = 'normal') {
+        if (kind === 'quick') return 1.0;
+        if (kind === 'power') return 1.55;
+        if (kind === 'spell') return 1.3;
+        return 1.2;
     },
     computeDotDamageFromAffix(affix, attacker) {
         if (!affix) return 0;
@@ -1575,7 +1581,7 @@ const combat = {
         }
         return someoneDied;
     },
-    takeDamage(amount, target) {
+    takeDamage(amount, target, hitKind = 'normal') {
         if(target === 'player') {
             let rem = amount;
             const armorBefore = this.armor || 0;
@@ -1619,6 +1625,31 @@ const combat = {
             const hpDmg = rem;
             e.hp -= hpDmg;
             if (e.hp < 0) e.hp = 0;
+            if (armorDmg > 0 || hpDmg > 0) {
+                const idx = this.activeEnemyIndex;
+                const avatar = idx === 1
+                    ? $('combat-avatar-enemy-2')
+                    : document.querySelector('.combat-avatar-enemy:not(.combat-avatar-enemy-2)');
+                const unit = idx === 1
+                    ? $('enemy-unit-2')
+                    : document.querySelector('.enemy-unit:not(.enemy-unit-2)');
+                [avatar, unit].forEach(el => {
+                    if (!el) return;
+                    const shakeScale = this.getEnemyHitShakeScale(hitKind);
+                    const angle = Math.random() * Math.PI * 2;
+                    const dirX = Math.cos(angle).toFixed(4);
+                    const dirY = Math.sin(angle).toFixed(4);
+                    const rotDir = Math.random() < 0.5 ? -1 : 1;
+                    const rotAmp = ((0.8 + Math.random() * 1.6) * shakeScale) * rotDir;
+                    el.style.setProperty('--enemy-punch-amp', String(shakeScale));
+                    el.style.setProperty('--enemy-punch-dir-x', dirX);
+                    el.style.setProperty('--enemy-punch-dir-y', dirY);
+                    el.style.setProperty('--enemy-punch-rot', `${rotAmp.toFixed(3)}deg`);
+                    el.classList.remove('enemy-hit-punch');
+                    void el.offsetWidth;
+                    el.classList.add('enemy-hit-punch');
+                });
+            }
             if(armorDmg > 0) {
                 playSfx('armorHit');
                 playSfx('armorHitMetal');
@@ -1932,7 +1963,7 @@ const combat = {
                                 this.logMessage(`Armor shatters for <span class="log-dmg">${shredAmt}</span>.`);
                             }
                         }
-                        this.takeDamage(dmg, 'enemy');
+                        this.takeDamage(dmg, 'enemy', type);
                         this.applyWeaponOnHitEffects(p, p.gear.weapon, 'enemy', this.activeEnemyIndex);
                         this.showDmg(dmg, 'enemy', isDisastrous ? 'disastrous' : (isCrit ? 'crit' : 'dmg'));
                         const label = type==='quick' ? 'Quick' : (type==='power' ? 'Power' : 'Normal');
@@ -2187,6 +2218,8 @@ const combat = {
             p.gold += gold; p.xp += xp;
             this.returnUnusedPotions();
             $('modal-victory').classList.remove('hidden');
+            const victoryModalBox = document.querySelector('#modal-victory .victory-modal');
+            if (victoryModalBox) victoryModalBox.classList.toggle('is-dungeon-victory', inDungeon);
 
             // --- Tournament header (round progress pips) ---
             const tourHeader = $('vic-tournament-header');

@@ -6,8 +6,11 @@
 
 -Achivements.
 
--combat animasyonları.
 -STUN CHANCE
+-Injuryler daha cok statları etkilesin Daha agır sonucları olsun.
+-Dungeon ekranı hala cok kötü durumda
+-Dungeon ekranında önemli textler glow olsun (örneğin chest yazısı altın glow olsun)
+-
 
 -Custom silah tasarlama ve üretme mekaniği? PLANLA
 
@@ -16,6 +19,7 @@
 MAGIC
 -Bazı büyüleri satın alabilmek için oyunda "Scroll" bulmak gerekecek para ve level ile satın alınamayacak öyle şak diye.
 -DEFENCE statı magic resistans'ı arttırsın.
+-spellere karşı resist olayı.
 
 ##DUNGEONS
 -Dungeonlarda dinamik efektler(oda gecislerinde blur shake falan filan. canlı hissettirsin.)

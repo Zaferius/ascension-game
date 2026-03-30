@@ -12,7 +12,6 @@ const SFX_MAP = {
         "assets/sfx/combat/flesh_hit2.wav",
         "assets/sfx/combat/flesh_hit3.wav",
         "assets/sfx/combat/flesh_hit4.wav",
-        "assets/sfx/combat/flesh_hit5.wav"
     ],
     armorHit: [
         "assets/sfx/combat/flesh_hit1.wav",

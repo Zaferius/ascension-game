@@ -519,36 +519,25 @@
                 </div>
             </div>
             <div class="dungeon-layout">
-                <div class="dungeon-map-panel">
-                    <div class="dungeon-map-head">
-                        <h3>Section Intel</h3>
-                        <button id="dungeon-intel-toggle" class="btn btn-xs dungeon-panel-toggle" type="button" aria-expanded="false" onclick="game.toggleDungeonPanel('intel')">Expand</button>
-                    </div>
-                    <div id="dungeon-section-panel-body" class="dungeon-collapsible-body hidden">
-                        <div id="dungeon-section-range" class="dungeon-section-range">Lv. 1-6</div>
-                        <div class="dungeon-section-card">
-                            <div class="dungeon-section-kicker">Current Bracket</div>
-                            <div id="dungeon-section-title" class="dungeon-section-title">Section 1 - The Shallows</div>
-                            <p id="dungeon-section-copy" class="dungeon-section-copy">Collapsed cells and weak scavengers.</p>
-                            <div class="dungeon-section-progress"><div id="dungeon-section-progress-fill" class="dungeon-section-progress-fill"></div></div>
-                            <div class="dungeon-section-stats">
-                                <div class="dungeon-section-stat"><span>Threat</span><strong id="dungeon-section-threat">Measured</strong></div>
-                                <div class="dungeon-section-stat"><span>Loot Focus</span><strong id="dungeon-section-loot">Starter gear and curatives</strong></div>
-                            </div>
-                        </div>
-                        <div class="dungeon-feed-wrap">
-                            <div class="dungeon-feed-headline">Recent Haul</div>
-                            <div id="dungeon-loot-feed" class="dungeon-loot-feed"></div>
-                        </div>
+                <div class="dungeon-room-panel dungeon-room-panel-wide">
+                    <div class="dungeon-feed-wrap">
+                        <div class="dungeon-feed-headline">Recent Haul</div>
+                        <div id="dungeon-loot-feed" class="dungeon-loot-feed"></div>
                     </div>
                 </div>
-                <div class="dungeon-room-panel">
+            </div>
+            <div class="dungeon-bottom-hud">
+                <div class="dungeon-hud-left">
+                    <div class="dungeon-room-kicker" style="margin-bottom:8px;">Gladiator Status</div>
+                    <div id="dungeon-player-strip" class="dungeon-player-strip"></div>
+                </div>
+                <div id="dungeon-hud-bag-card" class="dungeon-hud-bag-card">
                     <div class="dungeon-bag-head">
                         <div>
                             <div class="dungeon-room-kicker" style="margin-bottom:8px;">Battle Bag</div>
                             <h3 style="margin:0;">Consumables Ready</h3>
                         </div>
-                        <button id="dungeon-bag-toggle" class="btn btn-xs dungeon-panel-toggle" type="button" aria-expanded="false" onclick="game.toggleDungeonPanel('bag')">Expand</button>
+                        <button id="dungeon-hud-bag-toggle" class="btn btn-xs dungeon-panel-toggle" type="button" aria-expanded="false" onclick="game.toggleDungeonPanel('bag')">Expand</button>
                     </div>
                     <div id="dungeon-bag-panel-body" class="dungeon-collapsible-body hidden">
                         <div id="dungeon-bag-meta" class="dungeon-section-range">0 / 8 prepared</div>
@@ -557,7 +546,6 @@
                     </div>
                 </div>
             </div>
-            <div id="dungeon-player-strip" class="dungeon-player-strip"></div>
         </div>
     </div>
 
@@ -582,6 +570,7 @@
 
     <div id="modal-victory" class="modal-overlay hidden">
         <div class="modal-box victory-modal">
+            <div class="victory-main-col">
 
             <!-- Tournament round progress bar (hidden for pit fights) -->
             <div id="vic-tournament-header" class="vic-tournament-header hidden">
@@ -619,17 +608,28 @@
             </div>
 
             <div id="victory-tournament-banner" class="victory-tournament-banner hidden"></div>
-            <div id="victory-dungeon-loot" class="victory-dungeon-loot hidden">
-                <div class="victory-dungeon-loot-head">
-                    <div>
-                        <div class="victory-reward-label">Dungeon Loot</div>
-                        <div id="victory-dungeon-loot-meta" class="victory-dungeon-loot-meta"></div>
-                    </div>
-                </div>
-                <div id="victory-dungeon-loot-grid" class="victory-dungeon-loot-grid"></div>
-            </div>
-
             <button class="btn btn-primary victory-continue-btn" id="vic-continue-btn" onclick="game.closeVictory()">CONTINUE</button>
+            </div>
+            <div id="victory-dungeon-side" class="victory-dungeon-side hidden">
+                <div class="victory-dungeon-loot">
+                    <div class="victory-dungeon-loot-head">
+                        <div>
+                            <div class="victory-reward-label">Dungeon Loot</div>
+                            <div id="victory-dungeon-loot-meta" class="victory-dungeon-loot-meta"></div>
+                        </div>
+                    </div>
+                    <div id="victory-dungeon-loot-grid" class="victory-dungeon-loot-grid"></div>
+                </div>
+                <div class="victory-dungeon-bag-panel">
+                    <div class="victory-dungeon-loot-head">
+                        <div>
+                            <div class="victory-reward-label">Battle Bag</div>
+                            <div id="victory-dungeon-bag-meta" class="victory-dungeon-loot-meta"></div>
+                        </div>
+                    </div>
+                    <div id="victory-dungeon-bag-grid" class="victory-dungeon-loot-grid"></div>
+                </div>
+            </div>
         </div>
     </div>
 

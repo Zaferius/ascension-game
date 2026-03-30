@@ -585,6 +585,11 @@ The project recently received a round of UI/UX improvements that AI agents shoul
 - twirl VFX now exits with a short fade-out for cleaner readability
 - enemy info stacks (name/level + armor/health bars) were repositioned to align with the enemy portrait block
 - player portrait in combat is currently hidden to keep the lower-left HUD cleaner while preserving player bars/name panel
+- combat hit SFX now use randomized flesh-impact variants from `assets/sfx/combat/` instead of a single repeated hit sample
+- armor-absorbed hits now additionally layer a guaranteed metal impact (`assets/sfx/combat/hit-metal.wav`) on top of the randomized hit sound
+- enemy hit reaction now applies a synchronized punch-shake to the full enemy cluster (avatar + name/level + HP/Armor bars)
+- punch-shake direction/angle is randomized per hit for more organic impact feedback
+- punch-shake intensity now scales by action type: `Quick` < `Normal` < `Spell` < `Power`
 
 ### Inventory bag UI
 
